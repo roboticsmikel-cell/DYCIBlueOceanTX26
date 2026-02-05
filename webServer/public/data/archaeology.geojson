@@ -1,0 +1,140 @@
+{
+  "type": "FeatureCollection",
+  "name": "National Museum of the Philippines – Archaeological Artifacts",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [122.404167, 13.522222]
+      },
+      "properties": {
+        "collection_id": "stoneware-porcelain",
+        "collection_title": "Stoneware and Porcelain",
+        "location_name": "Mt. Kamhantik, Mulanay, Quezon Province",
+        "context": "Buried in a carved limestone sarcophagus",
+        "date_range": "12th–14th century CE",
+        "category": "Foreign wares",
+        "museum": "National Museum of the Philippines"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [120.5423, 15.0711]
+      },
+      "properties": {
+        "collection_id": "stoneware-porcelain",
+        "collection_title": "Stoneware and Porcelain",
+        "location_name": "Porac, Pampanga",
+        "date_range": "14th–16th century CE",
+        "category": "Ceramic trade wares",
+        "museum": "National Museum of the Philippines"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [122.56, 10.7]
+      },
+      "properties": {
+        "collection_id": "stoneware-porcelain",
+        "collection_title": "Stoneware and Porcelain",
+        "location_name": "Oton, Iloilo",
+        "category": "Ceramic trade wares",
+        "museum": "National Museum of the Philippines"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [123.89, 10.32]
+      },
+      "properties": {
+        "collection_id": "stoneware-porcelain",
+        "collection_title": "Stoneware and Porcelain",
+        "location_name": "Plaza Independencia, Cebu City",
+        "category": "Ceramic trade wares",
+        "museum": "National Museum of the Philippines"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [121.95, 20.45]
+      },
+      "properties": {
+        "collection_id": "burial-jar-collection",
+        "collection_title": "Burial Jar Collection",
+        "location_name": "Batanes Islands",
+        "site_type": "Burial jars",
+        "period": "Metal Age",
+        "museum": "National Museum of the Philippines"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [124.9258, 6.2069]
+      },
+      "properties": {
+        "collection_id": "burial-jar-collection",
+        "collection_title": "Burial Jar Collection",
+        "location_name": "Maitum, Sarangani Province",
+        "site_type": "Anthropomorphic burial jars",
+        "period": "Metal Age",
+        "museum": "National Museum of the Philippines"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [123.17, 9.19]
+      },
+      "properties": {
+        "collection_id": "burial-jar-collection",
+        "collection_title": "Burial Jar Collection",
+        "location_name": "Bacong, Negros Oriental",
+        "site_type": "Earthenware burial vessels",
+        "period": "Metal Age",
+        "museum": "National Museum of the Philippines"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [124.6, 6.6833]
+      },
+      "properties": {
+        "collection_id": "burial-jar-collection",
+        "collection_title": "Burial Jar Collection",
+        "location_name": "Kulaman Plateau, Sultan Kudarat",
+        "site_type": "Limestone burial urns",
+        "period": "Metal Age",
+        "museum": "National Museum of the Philippines"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [123.0, 11.0]
+      },
+      "properties": {
+        "collection_id": "wooden-coffins",
+        "collection_title": "Wooden Coffins",
+        "location_name": "Central Philippines (general region)",
+        "period": "Protohistoric Period",
+        "date_range": "12th–15th century CE",
+        "museum": "National Museum of the Philippines"
+      }
+    }
+  ]
+}
