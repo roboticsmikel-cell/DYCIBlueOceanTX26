@@ -17,4 +17,4 @@ export default function CameraCard() {
       </div>
     </div>
   );
-}
+}git
