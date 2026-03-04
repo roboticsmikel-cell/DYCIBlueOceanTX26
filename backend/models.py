@@ -16,6 +16,7 @@ class Artifact(db.Model):
     collection_museum = db.Column(db.String(255))
     collection_info = db.Column(db.Text)
     lat_long = db.Column(db.String(100))
+    model_path = db.Column(db.String)
 
 class Image(db.Model):
     __tablename__ = "images"
@@ -73,3 +74,11 @@ class AIConversation(db.Model):
     message = db.Column(db.Text)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
+class Detection(db.Model):
+    __tablename__ = "detections"
+
+    detection_id = db.Column(db.Integer, primary_key=True)
+    label = db.Column(db.String(255), nullable=False)
+    lat_long = db.Column(db.String(255))
+    detected_at = db.Column(db.DateTime)
+    model_path = db.Column(db.String)

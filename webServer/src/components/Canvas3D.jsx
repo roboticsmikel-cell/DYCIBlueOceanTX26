@@ -6,24 +6,22 @@ import CameraCard from "./CameraCard";
 import InfoCard from "./InfoCard";
 import ImageCard from "./ImageCard";
 import AnalysisCard from "./AnalysisCard";
+import DetectionTable from "./DetectionTable";
 import TypingAssistantPanel from "./TypingAssistantPanel";
 import SpeakingAssistantPanel from "./SpeakingAssistantPanel";
 
-function Model() {
-  const { scene } = useGLTF("/models/vase.glb");
+function Model({ modelPath }) {
+  const { scene } = useGLTF(modelPath);
   return <primitive object={scene} scale={1.5} />;
 }
 
-export default function Canvas3D({ artifact, onBack }) {
+export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   const [details, setDetails] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [activeImage, setActiveImage] = useState(null);
 
-  // ----------------------------
-  // Load artifact details
-  // ----------------------------
   useEffect(() => {
-    if (!artifact?.id) return;
+    if (!artifact?.id || artifact.type !== "artifact") return;
 
     fetch(`http://127.0.0.1:8000/api/artifacts/${artifact.id}`)
       .then(res => res.json())
@@ -31,11 +29,8 @@ export default function Canvas3D({ artifact, onBack }) {
       .catch(console.error);
   }, [artifact]);
 
-  // ----------------------------
-  // Load latest AI analysis
-  // ----------------------------
   useEffect(() => {
-    if (!artifact?.id) return;
+    if (!artifact?.id || artifact.type !== "artifact") return;
 
     fetch(`http://127.0.0.1:8000/api/ai-analysis/${artifact.id}`)
       .then(res => res.json())
@@ -43,11 +38,8 @@ export default function Canvas3D({ artifact, onBack }) {
       .catch(console.error);
   }, [artifact]);
 
-  // ----------------------------
-  // Load latest image for artifact
-  // ----------------------------
   useEffect(() => {
-    if (!artifact?.id) return;
+    if (!artifact?.id || artifact.type !== "artifact") return;
 
     fetch(`http://127.0.0.1:8000/api/images/latest/${artifact.id}`)
       .then(res => (res.ok ? res.json() : null))
@@ -57,7 +49,6 @@ export default function Canvas3D({ artifact, onBack }) {
 
   return (
     <div className="relative h-screen w-full bg-black">
-      {/* Back Button */}
       <button
         onClick={onBack}
         className="absolute top-4 left-4 z-20 text-cyan-300 border border-cyan-300 px-3 py-1 rounded"
@@ -65,8 +56,14 @@ export default function Canvas3D({ artifact, onBack }) {
         ← Back to Map
       </button>
 
-      {/* Artifact Info */}
-      {/* {details && (
+      <button
+        onClick={onViewData}
+        className="absolute top-70 right-10 z-20 text-cyan-300 border border-cyan-300 px-3 py-1 rounded hover:bg-cyan-300"
+      >
+        View Data
+      </button>
+
+      {details && (
         <div className="absolute top-6 right-6 z-20 w-80 pointer-events-none">
           <InfoCard
             category={details.category}
@@ -78,11 +75,10 @@ export default function Canvas3D({ artifact, onBack }) {
             period={details.period}
           />
         </div>
-      )} */}
+      )}
 
-      {/* AI Analysis */}
-      {/* {analysis && (
-        <div className="absolute top-56 right-6 z-20 w-80 pointer-events-none">
+      {/* {artifact?.type === "artifact" && analysis && (
+        <div className="absolute top-5 right-6 z-20 w-80 pointer-events-none">
           <AnalysisCard
             material={analysis.material}
             category={analysis.category}
@@ -93,13 +89,18 @@ export default function Canvas3D({ artifact, onBack }) {
         </div>
       )} */}
 
-      {/* AI Assistants (share same image) */}
+      {artifact?.type === "detection" && (
+        <div className="absolute top-5 right-6 z-20 w-80">
+          <DetectionTable />
+        </div>
+      )}
+
       {artifact && (
         <>
-          <TypingAssistantPanel
+          {/* <TypingAssistantPanel
             collectionId={artifact.id}
             image={activeImage}
-          />
+          /> */}
           <SpeakingAssistantPanel
             collectionId={artifact.id}
             image={activeImage}
@@ -107,21 +108,30 @@ export default function Canvas3D({ artifact, onBack }) {
         </>
       )}
 
-      {/* Latest Image */}
-      <div className="absolute top-40 left-6 z-20 pointer-events-none">
+      <div className="absolute top-20 left-6 z-20 pointer-events-none">
         <ImageCard image={activeImage} />
       </div>
 
-      {/* Camera Panel */}
-      <div className="absolute bottom-5 left-6 z-20 pointer-events-none">
+      <div className="absolute bottom-20 left-6 z-20 pointer-events-none">
         <CameraCard />
       </div>
 
-      {/* 3D Viewer */}
-      <Canvas camera={{ position: [0, 2, 5], fov: 50 }}>
-        <ambientLight intensity={0.6} />
+      <button
+        onClick={onStream}
+        className="absolute bottom-5 left-6 z-30 text-sm font-semibold text-cyan-300 mt-4 rounded-xl border border-cyan-300 bg-black/70 p-3 shadow-lg">
+        View T.U.K.L.A.S. Camera
+      </button>
+
+      <Canvas 
+        camera={{ position: [0, 2, 5], fov: 50 }}
+        gl={{ preserveDrawingBuffer: false }}
+        onCreated={({ gl }) => {
+          gl.setClearColor("#000000");
+        }}
+      >
+        <ambientLight intensity={0.5} />  
         <directionalLight position={[5, 5, 5]} intensity={1} />
-        <Model />
+        <Model modelPath={`/models/${artifact.model}`} />
         <OrbitControls />
       </Canvas>
     </div>

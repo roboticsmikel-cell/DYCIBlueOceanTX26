@@ -4,7 +4,7 @@ from flask import Flask, jsonify, request, abort, send_file
 from flask_cors import CORS
 
 import config
-from models import db, Artifact, Image, AIArtifactAnalysis, AIConversation
+from models import db, Artifact, Image, AIArtifactAnalysis, AIConversation, Detection
 from gemini_service import chat_with_gemini, run_gemini_for_artifact
 
 app = Flask(__name__)
@@ -13,16 +13,10 @@ app.config.from_object(config)
 CORS(app)
 db.init_app(app)
 
-# -----------------------
-# ROOT
-# -----------------------
 @app.route("/")
 def index():
     return {"status": "Backend running"}
 
-# -----------------------
-# ARTIFACTS
-# -----------------------
 @app.route("/api/artifacts/<int:collection_id>")
 def get_artifact(collection_id):
     artifact = Artifact.query.get_or_404(collection_id)
@@ -57,16 +51,13 @@ def list_artifacts():
             "title": a.collection_title,
             "category": a.collection_category,
             "lat": lat,
-            "lng": lng
+            "lng": lng,
+            "model_path": a.model_path or "models/vase.glb"
+            # "model_path": a.model_path
         })
 
     return jsonify(results)
 
-# -----------------------
-# IMAGES (VIEWING)
-# -----------------------
-
-# 🔹 Serve image bytes from PostgreSQL
 @app.route("/api/images/<int:image_id>")
 def get_image(image_id):
     image = Image.query.get_or_404(image_id)
@@ -81,7 +72,25 @@ def get_image(image_id):
         as_attachment=False
     )
 
-# 🔹 Get ALL images for an artifact (collection_id = 5)
+@app.route("/api/artifacts/table")
+def artifacts_table():
+    artifacts = Artifact.query.order_by(Artifact.collection_id).all()
+
+    return jsonify([
+        {
+            "id": a.collection_id,
+            "location": a.location_name,
+            "title": a.collection_title,
+            "period": a.period,
+            "date_range": a.date_range,
+            "category": a.collection_category,
+            "museum": a.collection_museum,
+            "context": a.collection_info,
+            "coordinates": a.lat_long,
+        }
+        for a in artifacts
+    ])
+
 @app.route("/api/images/by-artifact/<int:collection_id>")
 def get_images_by_artifact(collection_id):
     images = (
@@ -100,7 +109,6 @@ def get_images_by_artifact(collection_id):
         for img in images
     ])
 
-# 🔹 Get LATEST image for artifact (used by ImageCard)
 @app.route("/api/images/latest/<int:collection_id>")
 def get_latest_image(collection_id):
     image = (
@@ -115,9 +123,6 @@ def get_latest_image(collection_id):
 
     return jsonify({ "id": image.image_id })
 
-# -----------------------
-# AI ANALYSIS (unchanged)
-# -----------------------
 @app.route("/api/ai-analysis/<int:collection_id>")
 def get_ai_analysis(collection_id):
     analyses = (
@@ -141,9 +146,6 @@ def get_ai_analysis(collection_id):
         for a in analyses
     ])
 
-# -----------------------
-# AI CHAT (unchanged)
-# -----------------------
 @app.route("/api/assistant/chat", methods=["POST", "OPTIONS"])
 def assistant_chat():
     if request.method == "OPTIONS":
@@ -167,17 +169,14 @@ def assistant_chat():
             "context": artifact.collection_info
         }
 
-    # Save USER message
     db.session.add(AIConversation(
         collection_id=collection_id,
         role="user",
         message=user_message
     ))
 
-    # 🔹 CALL GEMINI SERVICE
     result = chat_with_gemini(user_message, artifact_context)
 
-    # 🔹 HANDLE FIXED ANALYZE IMAGE
     if result["type"] == "fixed_analyze_image" and image_id:
         image = Image.query.get_or_404(image_id)
 
@@ -198,7 +197,6 @@ def assistant_chat():
 
     assistant_text = result["speech"]
 
-    # Save ASSISTANT message (TEXT ONLY)
     db.session.add(AIConversation(
         collection_id=collection_id,
         role="assistant",
@@ -207,11 +205,36 @@ def assistant_chat():
 
     db.session.commit()
 
-    # 🔹 RETURN STRUCTURED RESPONSE
     return jsonify(result)
 
-# -----------------------
-# RUN SERVER
-# -----------------------
+@app.route("/api/detections")
+def list_detections():
+    detections = Detection.query.order_by(
+        Detection.detected_at.desc()
+    ).all()
+
+    results = []
+
+    for d in detections:
+        if not d.lat_long:
+            continue
+
+        try:
+            lat, lng = map(float, d.lat_long.split(","))
+        except ValueError:
+            continue
+
+        results.append({
+            "id": d.detection_id,
+            "label": d.label,
+            "lat": lat,
+            "lng": lng,
+            "model_path": d.model_path or "models/jar.glb",
+            "detected_at": d.detected_at.isoformat()
+            if d.detected_at else None
+        })
+
+    return jsonify(results)
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8000)

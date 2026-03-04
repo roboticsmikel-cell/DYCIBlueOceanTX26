@@ -42,7 +42,7 @@ const CLASS_COLORS = {
   default: "#FF3D81"        // neon pink
 };
 
-export default function Map({ onSelect }) {
+export default function Map({ onSelect, onStream }) {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
 
@@ -89,13 +89,13 @@ export default function Map({ onSelect }) {
 
     mapInstance.current = map;
 
+    const bounds = new google.maps.LatLngBounds();
+    let hasValid = false;
+
     fetch("http://127.0.0.1:8000/api/artifacts")
       .then(res => res.json())
       .then(artifacts => {
         if (!Array.isArray(artifacts)) return;
-
-        const bounds = new google.maps.LatLngBounds();
-        let hasValid = false;
 
         artifacts.forEach(a => {
           const lat = Number(a.lat);
@@ -103,6 +103,7 @@ export default function Map({ onSelect }) {
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
           const position = { lat, lng };
+
           const color =
             CLASS_COLORS[a.class_type] || CLASS_COLORS.default;
 
@@ -128,8 +129,11 @@ export default function Map({ onSelect }) {
             onSelect({
               id: a.id,
               title: a.title,
-              model: "burial_jar.glb"
+              model: "vase.glb",
+              // model: a.model_path,
+              type: "artifact"
             });
+            console.log(a.model_path);
           });
         });
 
@@ -138,14 +142,67 @@ export default function Map({ onSelect }) {
       .catch(err => {
         console.error("Failed to load artifacts:", err);
       });
+
+    fetch("http://127.0.0.1:8000/api/detections")
+      .then(res => res.json())
+      .then(detections => {
+        if (!Array.isArray(detections)) return;
+
+        detections.forEach(d => {
+          const lat = Number(d.lat);
+          const lng = Number(d.lng);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+          const position = { lat, lng };
+
+          // Neon red/pink for AI detections
+          const marker = new google.maps.Marker({
+            position,
+            map,
+            title: d.label,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 6,                     // slightly smaller than artifacts
+              fillColor: "#f7c100ff",       
+              fillOpacity: 1,
+              strokeColor: "#FFFFFF",
+              strokeOpacity: 0.7,
+              strokeWeight: 2
+            }
+          });
+
+          bounds.extend(position);
+          hasValid = true;
+
+          marker.addListener("click", () => {
+            onSelect({
+              id: d.id,
+              title: d.label,
+              model: "jar.glb",
+              // model: d.model_h,
+              type: "detection"
+            });
+          });
+        });
+
+        if (hasValid) map.fitBounds(bounds);
+      })
+      .catch(err => {
+        console.error("Failed to load detections:", err);
+      });
   }
 
   return (
     <div className="h-screen w-full">
       <div ref={mapRef} className="h-full w-full" />
-      <div className="absolute bottom-5 left-6 z-20 pointer-events-none">
+      <div className="absolute bottom-23 left-6 z-20 pointer-events-none">
         <CameraCard />
       </div>
+      <button
+        onClick={onStream}
+        className="absolute bottom-9 left-6 z-30 text-sm font-semibold text-cyan-300 mt-4 rounded-xl border border-cyan-300 bg-black/70 p-3 shadow-lg">
+        View T.U.K.L.A.S. Camera
+      </button>
     </div>
   );
 }

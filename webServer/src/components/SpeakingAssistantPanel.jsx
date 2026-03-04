@@ -15,7 +15,8 @@ export default function SpeakingAssistantPanel({ collectionId }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         collection_id: collectionId,
-        message: text
+        message: text,
+        // image_id: image?.id
       })
     });
 

@@ -1,4 +1,5 @@
-import React from 'react'
+import React from 'react';
+import Counter from './Counter';
 
 const InfoCard = ({
   locationName = "Unknown Location",
@@ -27,8 +28,15 @@ const InfoCard = ({
                 <p className="text-[11px] text-white">{context}</p>
             </div>
             <div className="mt-1 h-px w-full bg-cyan-400/20" />
-            <p className="mt-1 text-xs font-medium text-cyan-200/80">{locationName}</p>
+            <p className="mt-1 text-xs font-medium text-cyan-200/80"> {locationName}</p>
             <p className="text-[11px] text-cyan-300/60">{period}</p>
+
+            <div className="mt-1 h-px w-full bg-cyan-400/20" />
+            <div>
+                <p className="mt-1 text-xs font-medium text-cyan-200/80">Estimated Measurement (cm):</p>
+                <Counter />
+
+            </div>
         </div>
     )
 }
