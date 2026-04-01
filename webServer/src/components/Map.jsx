@@ -195,14 +195,14 @@ export default function Map({ onSelect, onStream }) {
   return (
     <div className="h-screen w-full">
       <div ref={mapRef} className="h-full w-full" />
-      <div className="absolute bottom-23 left-6 z-20 pointer-events-none">
+      {/* <div className="absolute bottom-23 left-6 z-20 pointer-events-none">
         <CameraCard />
-      </div>
-      <button
+      </div> */}
+      {/* <button
         onClick={onStream}
         className="absolute bottom-9 left-6 z-30 text-sm font-semibold text-cyan-300 mt-4 rounded-xl border border-cyan-300 bg-black/70 p-3 shadow-lg">
         View T.U.K.L.A.S. Camera
-      </button>
+      </button> */}
     </div>
   );
 }

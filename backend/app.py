@@ -1,5 +1,9 @@
 import os
 import io
+
+import sys
+print("PYTHON:", sys.executable)
+
 from flask import Flask, jsonify, request, abort, send_file
 from flask_cors import CORS
 

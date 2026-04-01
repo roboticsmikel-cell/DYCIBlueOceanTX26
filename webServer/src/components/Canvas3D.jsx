@@ -24,7 +24,7 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
     fetch(`http://127.0.0.1:8000/api/artifacts/${artifact.id}`)
-      .then(res => res.json())
+      .then((res) => res.json())
       .then(setDetails)
       .catch(console.error);
   }, [artifact]);
@@ -33,8 +33,8 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
     fetch(`http://127.0.0.1:8000/api/ai-analysis/${artifact.id}`)
-      .then(res => res.json())
-      .then(data => setAnalysis(data[0] || null))
+      .then((res) => res.json())
+      .then((data) => setAnalysis(data[0] || null))
       .catch(console.error);
   }, [artifact]);
 
@@ -42,98 +42,97 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
     fetch(`http://127.0.0.1:8000/api/images/latest/${artifact.id}`)
-      .then(res => (res.ok ? res.json() : null))
+      .then((res) => (res.ok ? res.json() : null))
       .then(setActiveImage)
       .catch(console.error);
   }, [artifact]);
 
   return (
-    <div className="relative h-screen w-full bg-black">
-      <button
-        onClick={onBack}
-        className="absolute top-4 left-4 z-20 text-cyan-300 border border-cyan-300 px-3 py-1 rounded"
-      >
-        ← Back to Map
-      </button>
+    <div className="grid h-screen w-full gap-4 p-4 grid-cols-1 grid-rows-4 md:grid-cols-2 md:grid-rows-2 bg-black text-white">
+      
+      {/* TOP LEFT */}
+      <div className="relative min-h-0 overflow-hidden rounded-xl border border-cyan-500">
+        <button
+          onClick={onBack}
+          className="absolute top-4 left-4 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
+        >
+          ← Back to Map
+        </button>
 
-      <button
-        onClick={onViewData}
-        className="absolute top-70 right-10 z-20 text-cyan-300 border border-cyan-300 px-3 py-1 rounded hover:bg-cyan-300"
-      >
-        View Data
-      </button>
-
-      {details && (
-        <div className="absolute top-6 right-6 z-20 w-80 pointer-events-none">
-          <InfoCard
-            category={details.category}
-            museum={details.museum}
-            collectionTitle={details.collectionTitle}
-            dateRange={details.dateRange}
-            context={details.context}
-            locationName={details.locationName}
-            period={details.period}
-          />
+        <div className="h-full w-full">
+          <Canvas
+            camera={{ position: [0, 2, 5], fov: 50 }}
+            onCreated={({ gl }) => gl.setClearColor("#000000")}
+          >
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[5, 5, 5]} intensity={1} />
+            {artifact?.model && <Model modelPath={`/models/${artifact.model}`} />}
+            <OrbitControls />
+          </Canvas>
         </div>
-      )}
-
-      {/* {artifact?.type === "artifact" && analysis && (
-        <div className="absolute top-5 right-6 z-20 w-80 pointer-events-none">
-          <AnalysisCard
-            material={analysis.material}
-            category={analysis.category}
-            estimatedAge={analysis.estimated_age}
-            possibleLocation={analysis.possible_location}
-            preservationCondition={analysis.preservation_condition}
-          />
-        </div>
-      )} */}
-
-      {artifact?.type === "detection" && (
-        <div className="absolute top-5 right-6 z-20 w-80">
-          <DetectionTable />
-        </div>
-      )}
-
-      {artifact && (
-        <>
-          {/* <TypingAssistantPanel
-            collectionId={artifact.id}
-            image={activeImage}
-          /> */}
-          <SpeakingAssistantPanel
-            collectionId={artifact.id}
-            image={activeImage}
-          />
-        </>
-      )}
-
-      <div className="absolute top-20 left-6 z-20 pointer-events-none">
-        <ImageCard image={activeImage} />
       </div>
 
-      <div className="absolute bottom-20 left-6 z-20 pointer-events-none">
+      {/* TOP RIGHT */}
+      <div className="flex min-h-0 flex-col justify-between rounded-xl border border-cyan-500 p-4 overflow-auto">
+        <div className="flex  flex-col gap-4 ">
+          {details && (
+            <InfoCard
+              category={details.category}
+              museum={details.museum}
+              collectionTitle={details.collectionTitle}
+              dateRange={details.dateRange}
+              context={details.context}
+              locationName={details.locationName}
+              period={details.period}
+            />
+          )}
+
+          {analysis && artifact?.type === "artifact" && (
+            <AnalysisCard
+              material={analysis.material}
+              category={analysis.category}
+              estimatedAge={analysis.estimated_age}
+              possibleLocation={analysis.possible_location}
+              preservationCondition={analysis.preservation_condition}
+            />
+          )}
+
+          {artifact?.type === "detection" && <DetectionTable />}
+        </div>
+
+        <div className="pt-4">
+          <button
+            onClick={onViewData}
+            className="rounded border border-cyan-300 px-3 py-1 text-cyan-300"
+          >
+            View Data
+          </button>
+        </div>
+      </div>
+
+      {/* BOTTOM LEFT */}
+      <div className="flex min-h-0 flex-col gap-4 rounded-xl border border-cyan-500 p-4 overflow-auto">
+        {/* <ImageCard image={activeImage} /> */}
+
+        <SpeakingAssistantPanel
+          collectionId={artifact?.id}
+          image={activeImage}
+        />
+      </div>
+
+      {/* BOTTOM RIGHT */}
+      <div className="flex min-h-0 flex-col justify-between rounded-xl border border-cyan-500 p-4 overflow-auto">
         <CameraCard />
+
+        <div className="pt-4">
+          <button
+            onClick={onStream}
+            className="w-fit rounded border border-cyan-300 px-3 py-1 text-cyan-300"
+          >
+            View T.U.K.L.A.S. Camera
+          </button>
+        </div>
       </div>
-
-      <button
-        onClick={onStream}
-        className="absolute bottom-5 left-6 z-30 text-sm font-semibold text-cyan-300 mt-4 rounded-xl border border-cyan-300 bg-black/70 p-3 shadow-lg">
-        View T.U.K.L.A.S. Camera
-      </button>
-
-      <Canvas 
-        camera={{ position: [0, 2, 5], fov: 50 }}
-        gl={{ preserveDrawingBuffer: false }}
-        onCreated={({ gl }) => {
-          gl.setClearColor("#000000");
-        }}
-      >
-        <ambientLight intensity={0.5} />  
-        <directionalLight position={[5, 5, 5]} intensity={1} />
-        <Model modelPath={`/models/${artifact.model}`} />
-        <OrbitControls />
-      </Canvas>
     </div>
   );
 }

@@ -7,32 +7,34 @@ export default function SpeakingAssistantPanel({ collectionId }) {
   async function sendMessage(text) {
     if (!text.trim()) return;
 
-    // show user message
-    setMessages(m => [...m, { role: "user", text }]);
+    setMessages((m) => [...m, { role: "user", text }]);
 
-    const res = await fetch("http://127.0.0.1:8000/api/assistant/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        collection_id: collectionId,
-        message: text,
-        // image_id: image?.id
-      })
-    });
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/assistant/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          collection_id: collectionId,
+          message: text,
+        }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
+      const replyText = data.speech || data.reply || "";
 
-    // 🔹 support structured backend response
-    const replyText = data.speech || data.reply || "";
+      setMessages((m) => [...m, { role: "assistant", text: replyText || "No response received." }]);
 
-    // show assistant reply
-    setMessages(m => [...m, { role: "assistant", text: replyText }]);
-
-    // 🔊 SPEAK AI REPLY
-    if (replyText) {
-      const utterance = new SpeechSynthesisUtterance(replyText);
-      utterance.lang = "en-US";
-      speechSynthesis.speak(utterance);
+      if (replyText) {
+        const utterance = new SpeechSynthesisUtterance(replyText);
+        utterance.lang = "en-US";
+        speechSynthesis.speak(utterance);
+      }
+    } catch (error) {
+      console.error(error);
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", text: "Connection error. Unable to reach assistant." },
+      ]);
     }
   }
 
@@ -49,10 +51,10 @@ export default function SpeakingAssistantPanel({ collectionId }) {
 
     setListening(true);
 
-    recognition.onresult = event => {
+    recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       sendMessage(transcript);
-      setListening(false);  
+      setListening(false);
     };
 
     recognition.onerror = () => setListening(false);
@@ -62,33 +64,56 @@ export default function SpeakingAssistantPanel({ collectionId }) {
   }
 
   return (
-    <div className="absolute bottom-20 right-6 w-80 h-72 z-20 flex flex-col rounded-xl border border-cyan-400/40
-                    bg-[#020a13]/90 p-3 text-cyan-100">
+    <div
+      className="flex w-full h-full min-h-[200px] flex-col rounded-xl border border-cyan-400/40
+                 bg-[#020a13]/90 p-3 text-cyan-100 shadow-[0_0_25px_rgba(0,229,255,0.15)]"
+    >
+      <div className="mb-2 flex items-center justify-between border-b border-cyan-400/20 pb-2">
+        <span className="text-xs uppercase tracking-widest text-cyan-400">
+          {listening ? "Listening..." : "T.U.K.L.A.S. A.I."}
+        </span>
 
-      <div className="flex-1 overflow-y-auto space-y-2 text-sm">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={m.role === "user"
-              ? "text-right text-cyan-300"
-              : "text-left text-white"}
-          >
-            {m.text}
-          </div>
-        ))}
+        <span
+          className={`h-2 w-2 rounded-full ${
+            listening ? "bg-red-400" : "bg-cyan-400"
+          }`}
+        />
       </div>
 
-      <div className="mt-2 flex justify-between items-center">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
+        {messages.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-center text-xs text-cyan-400/70">
+            Say something to start the conversation.
+          </div>
+        ) : (
+          messages.map((m, i) => (
+            <div
+              key={i}
+              className={`max-w-[85%] rounded-lg px-3 py-2 ${
+                m.role === "user"
+                  ? "ml-auto border border-cyan-400/30 bg-cyan-400/10 text-right text-cyan-300"
+                  : "mr-auto border border-white/10 bg-white/5 text-left text-white"
+              }`}
+            >
+              <div className="mb-1 text-[10px] uppercase tracking-wider opacity-70">
+                {m.role === "user" ? "You" : "TUKLAS"}
+              </div>
+              <div>{m.text}</div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between border-t border-cyan-400/20 pt-2">
         <span className="text-xs text-cyan-400">
-          {listening ? "Listening…" : "Voice Assistant"}
+          {listening ? "Microphone active" : "Ready"}
         </span>
 
         <button
           onClick={startListening}
-          className="border border-cyan-400 px-3 py-1 rounded
-                     text-cyan-300 hover:bg-cyan-400/10"
+          className="rounded border border-cyan-400 px-3 py-1 text-cyan-300 transition hover:bg-cyan-400/10"
         >
-          Talk
+          {listening ? "Listening..." : "Talk"}
         </button>
       </div>
     </div>
