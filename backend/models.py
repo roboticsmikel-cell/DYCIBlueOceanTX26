@@ -23,17 +23,22 @@ class Image(db.Model):
 
     image_id = db.Column(db.Integer, primary_key=True)
 
-    # 🔴 THIS WAS MISSING
     collection_id = db.Column(
         db.Integer,
         db.ForeignKey("artifacts.collection_id", ondelete="CASCADE"),
         nullable=False
     )
 
+    detection_id = db.Column(
+        db.Integer,
+        db.ForeignKey("detections.detection_id", ondelete="CASCADE"),
+        nullable=True
+    )
+
     image_data = db.Column(db.LargeBinary, nullable=False)
     image_name = db.Column(db.String, nullable=True)
+    mime_type = db.Column(db.String(100))
 
-    # 🔴 REQUIRED for "latest image" logic
     captured_at = db.Column(
         db.DateTime,
         server_default=db.func.now(),
@@ -41,6 +46,7 @@ class Image(db.Model):
     )
 
     artifact = db.relationship("Artifact", backref="images")
+    detection = db.relationship("Detection", backref="images")
 
 class AIArtifactAnalysis(db.Model):
     __tablename__ = "ai_artifact_analysis"
@@ -82,3 +88,31 @@ class Detection(db.Model):
     lat_long = db.Column(db.String(255))
     detected_at = db.Column(db.DateTime)
     model_path = db.Column(db.String)
+
+class Model3D(db.Model):
+    __tablename__ = "models_3d"
+
+    model_id = db.Column(db.Integer, primary_key=True)
+    detection_id = db.Column(
+        db.Integer,
+        db.ForeignKey("detections.detection_id", ondelete="CASCADE"),
+        nullable=True
+    )
+    image_id = db.Column(
+        db.Integer,
+        db.ForeignKey("images.image_id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    meshy_task_id = db.Column(db.Text)
+    status = db.Column(db.String(50), default="PENDING")
+    progress = db.Column(db.Integer, default=0)
+
+    glb_url = db.Column(db.Text)
+    obj_url = db.Column(db.Text)
+    fbx_url = db.Column(db.Text)
+    usdz_url = db.Column(db.Text)
+
+    error_message = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    generated_at = db.Column(db.DateTime)
