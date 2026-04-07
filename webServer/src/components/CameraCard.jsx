@@ -3,11 +3,11 @@ import React from "react";
 export default function CameraCard() {
   return (
     // <div className="flex h-full flex-col rounded-xl border border-cyan-300 bg-black/70 p-3 shadow-lg">
-    <div className="flex h-full flex-col rounded-xl bg-black/70 p-3 shadow-lg">
+    <div className="flex h-full flex-col rounded-xl bg-black/70 shadow-lg">
       
-      <h3 className="mb-2 text-sm font-semibold text-cyan-300">
+      {/* <h3 className="mb-2 text-sm font-semibold text-cyan-300">
         T.U.K.L.A.S. Camera
-      </h3>
+      </h3> */}
 
       <div className="aspect-video w-full overflow-hidden rounded-lg border border-cyan-300">
       {/* <div className="aspect-video w-full overflow-hidden"> */}

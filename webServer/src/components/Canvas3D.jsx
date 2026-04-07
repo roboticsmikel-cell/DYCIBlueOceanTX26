@@ -51,13 +51,27 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
     <div className="grid h-screen w-full gap-4 p-4 grid-cols-1 grid-rows-4 md:grid-cols-2 md:grid-rows-2 bg-black text-white">
       
       {/* TOP LEFT */}
+      <button
+          onClick={onBack}
+          className="absolute top-6 left-6 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
+      >
+          ← Back to Map
+      </button>
       <div className="relative min-h-0 overflow-hidden rounded-xl border border-cyan-500">
         <button
-          onClick={onBack}
-          className="absolute top-4 left-4 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
+          onClick={onStream}
+          className="absolute bottom-4 right-4 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
         >
-          ← Back to Map
+          View T.U.K.L.A.S. Camera
         </button>
+
+        <div className="h-full w-full">
+          <CameraCard />
+        </div>
+      </div>
+
+      {/* TOP RIGHT */}
+      <div className="relative min-h-0 overflow-hidden rounded-xl border border-cyan-500">
 
         <div className="h-full w-full">
           <Canvas
@@ -72,9 +86,19 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
         </div>
       </div>
 
-      {/* TOP RIGHT */}
-      <div className="flex min-h-0 flex-col justify-between rounded-xl border border-cyan-500 p-4 overflow-auto">
-        <div className="flex  flex-col gap-4 ">
+      {/* BOTTOM LEFT */}
+      <div className="flex min-h-0 flex-col gap-4 rounded-xl border border-cyan-500 overflow-auto">
+        {/* <ImageCard image={activeImage} /> */}
+
+        <SpeakingAssistantPanel
+          collectionId={artifact?.id}
+          image={activeImage}
+        />
+      </div>
+
+      {/* BOTTOM RIGHT */}
+      <div className="flex min-h-0 flex-col justify-between rounded-xl border p-4 border-cyan-500 overflow-auto">
+        <div className="flex flex-col gap-4 ">
           {details && (
             <InfoCard
               category={details.category}
@@ -100,36 +124,12 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
           {artifact?.type === "detection" && <DetectionTable />}
         </div>
 
-        <div className="pt-4">
+        <div className="p-4">
           <button
             onClick={onViewData}
             className="rounded border border-cyan-300 px-3 py-1 text-cyan-300"
           >
             View Data
-          </button>
-        </div>
-      </div>
-
-      {/* BOTTOM LEFT */}
-      <div className="flex min-h-0 flex-col gap-4 rounded-xl border border-cyan-500 p-4 overflow-auto">
-        {/* <ImageCard image={activeImage} /> */}
-
-        <SpeakingAssistantPanel
-          collectionId={artifact?.id}
-          image={activeImage}
-        />
-      </div>
-
-      {/* BOTTOM RIGHT */}
-      <div className="flex min-h-0 flex-col justify-between rounded-xl border border-cyan-500 p-4 overflow-auto">
-        <CameraCard />
-
-        <div className="pt-4">
-          <button
-            onClick={onStream}
-            className="w-fit rounded border border-cyan-300 px-3 py-1 text-cyan-300"
-          >
-            View T.U.K.L.A.S. Camera
           </button>
         </div>
       </div>
