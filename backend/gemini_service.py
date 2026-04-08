@@ -5,7 +5,12 @@ import google.generativeai as genai
 from PIL import Image as PILImage
 from models import Artifact
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+# genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+
+gemini_api_key = os.getenv("GEMINI_API_KEY")
+if not gemini_api_key:
+    raise ValueError("GEMINI_API_KEY is not set")
+genai.configure(api_key=gemini_api_key)
 
 ANALYZE_IMAGE_TRIGGERS = [
     "analyze image",
