@@ -38,6 +38,8 @@ soundfile==0.12.1
 numpy==1.26.4
 requests==2.31.0
 
+gunicorn==22.0.0
+
 # OPTIONS:
 
 # backend framework
