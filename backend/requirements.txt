@@ -32,7 +32,7 @@ SpeechRecognition==3.10.1
 # Audio I/O
 sounddevice==0.4.6
 soundfile==0.12.1
-PyAudio==0.2.14
+# PyAudio==0.2.14
 
 # Utilities
 numpy==1.26.4
