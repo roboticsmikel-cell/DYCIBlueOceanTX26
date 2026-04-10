@@ -10,7 +10,8 @@ export default function SpeakingAssistantPanel({ collectionId }) {
     setMessages((m) => [...m, { role: "user", text }]);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/assistant/chat", {
+      // const res = await fetch("http://127.0.0.1:8000/api/assistant/chat", {
+      const res = await fetch("http://dyciblueoceantx26.onrender.com/api/assistant/chat", { // RENDER
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

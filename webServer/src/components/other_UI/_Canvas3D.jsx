@@ -52,7 +52,8 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   useEffect(() => {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
-    fetch(`http://127.0.0.1:8000/api/artifacts/${artifact.id}`)
+    // fetch(`http://127.0.0.1:8000/api/artifacts/${artifact.id}`)
+    fetch(`http://dyciblueoceantx26.onrender.com/api/artifacts/${artifact.id}`) // RENDER
       .then((res) => res.json())
       .then(setDetails)
       .catch(console.error);
@@ -61,7 +62,8 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   useEffect(() => {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
-    fetch(`http://127.0.0.1:8000/api/ai-analysis/${artifact.id}`)
+    // fetch(`http://127.0.0.1:8000/api/ai-analysis/${artifact.id}`)
+    fetch(`http://dyciblueoceantx26.onrender.com/api/ai-analysis/${artifact.id}`) // RENDER
       .then((res) => res.json())
       .then((data) => setAnalysis(data[0] || null))
       .catch(console.error);
@@ -70,7 +72,8 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   useEffect(() => {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
-    fetch(`http://127.0.0.1:8000/api/images/latest/${artifact.id}`)
+    // fetch(`http://127.0.0.1:8000/api/images/latest/${artifact.id}`)
+    fetch(`http://dyciblueoceantx26.onrender.com/api/images/latest/${artifact.id}`) // RENDER
       .then((res) => (res.ok ? res.json() : null))
       .then(setActiveImage)
       .catch(console.error);

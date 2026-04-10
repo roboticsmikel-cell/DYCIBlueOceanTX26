@@ -40,7 +40,8 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   useEffect(() => {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
-    fetch(`http://127.0.0.1:8000/api/artifacts/${artifact.id}`)
+    // fetch(`http://127.0.0.1:8000/api/artifacts/${artifact.id}`)
+    fetch(`http://dyciblueoceantx26.onrender.com/api/artifacts/${artifact.id}`) // RENDER
       .then((res) => res.json())
       .then(setDetails)
       .catch(console.error);
@@ -50,7 +51,8 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   useEffect(() => {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
-    fetch(`http://127.0.0.1:8000/api/ai-analysis/${artifact.id}`)
+    // fetch(`http://127.0.0.1:8000/api/ai-analysis/${artifact.id}`)
+    fetch(`http://dyciblueoceantx26.onrender.com/api/ai-analysis/${artifact.id}`) // RENDER
       .then((res) => res.json())
       .then((data) => setAnalysis(data[0] || null))
       .catch(console.error);
@@ -60,7 +62,8 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   useEffect(() => {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
-    fetch(`http://127.0.0.1:8000/api/images/latest/${artifact.id}`)
+    // fetch(`http://127.0.0.1:8000/api/images/latest/${artifact.id}`)
+    fetch(`http://dyciblueoceantx26.onrender.com/api/images/latest/${artifact.id}`) // RENDER
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         setActiveImage(data);
@@ -78,7 +81,8 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   useEffect(() => {
     if (!activeImage?.image_id) return;
 
-    fetch(`http://127.0.0.1:8000/api/models3d/by-image/${activeImage.image_id}`)
+    // fetch(`http://127.0.0.1:8000/api/models3d/by-image/${activeImage.image_id}`)
+    fetch(`http://dyciblueoceantx26.onrender.com/api/models3d/by-image/${activeImage.image_id}`) // RENDER
       .then((res) => res.json())
       .then((data) => {
         if (data.exists && data.viewer_url) {
@@ -102,7 +106,8 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
     pollingRef.current = setInterval(async () => {
       try {
         const res = await fetch(
-          `http://127.0.0.1:8000/api/models3d/check/${newModelId}`
+          // `http://127.0.0.1:8000/api/models3d/check/${newModelId}`
+          `http://dyciblueoceantx26.onrender.com/api/models3d/check/${newModelId}` // RENDER
         );
 
         const data = await res.json();
@@ -151,7 +156,8 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
       setModelUrl(null);
 
       const res = await fetch(
-        `http://127.0.0.1:8000/api/models3d/generate/${activeImage.image_id}`,
+        // `http://127.0.0.1:8000/api/models3d/generate/${activeImage.image_id}`,
+        `http://dyciblueoceantx26.onrender.com/api/models3d/generate/${activeImage.image_id}`, // RENDER
         { method: "POST" }
       );
 
@@ -225,7 +231,8 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
             </Canvas>
           ) : activeImage ? (
             <img
-              src={`http://127.0.0.1:8000/api/images/${activeImage.image_id}`}
+              // src={`http://127.0.0.1:8000/api/images/${activeImage.image_id}`}
+              src={`http://dyciblueoceantx26.onrender.com/api/images/${activeImage.image_id}`} // RENDER
               alt="Artifact"
               className="h-full w-full object-contain"
             />

@@ -92,7 +92,8 @@ export default function Map({ onSelect, onStream }) {
     const bounds = new google.maps.LatLngBounds();
     let hasValid = false;
 
-    fetch("http://127.0.0.1:8000/api/artifacts")
+    // fetch("http://127.0.0.1:8000/api/artifacts")
+    fetch("http://dyciblueoceantx26.onrender.com/api/artifacts") // RENDER
       .then(res => res.json())
       .then(artifacts => {
         if (!Array.isArray(artifacts)) return;
@@ -143,7 +144,8 @@ export default function Map({ onSelect, onStream }) {
         console.error("Failed to load artifacts:", err);
       });
 
-    fetch("http://127.0.0.1:8000/api/detections")
+    // fetch("http://127.0.0.1:8000/api/detections")
+    fetch("http://dyciblueoceantx26.onrender.com/api/detections") // RENDER
       .then(res => res.json())
       .then(detections => {
         if (!Array.isArray(detections)) return;

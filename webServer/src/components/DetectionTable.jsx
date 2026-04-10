@@ -4,7 +4,8 @@ export default function DetectionTable() {
   const [data, setData] = useState([]);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/detections")
+    // fetch("http://127.0.0.1:8000/api/detections")
+    fetch("http://dyciblueoceantx26.onrender.com/api/detections") // RENDER
       .then(res => res.json())
       .then(detections => {
         if (!Array.isArray(detections)) return;

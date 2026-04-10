@@ -7,7 +7,8 @@ export default function ArtifactsTablePage({ onBack }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/artifacts/table")
+    // fetch("http://127.0.0.1:8000/api/artifacts/table")
+    fetch("http://dyciblueoceantx26.onrender.com/api/artifacts/table") // RENDER
       .then(res => res.json())
       .then(data => {
         setRows(data);

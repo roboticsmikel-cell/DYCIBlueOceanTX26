@@ -5,9 +5,11 @@ export default function ImageCard({ image }) {
   // const imageUrl = http://127.0.0.1:8000/api/images/${image.id};
 
   const imageUrl = image?.id
-    ? `http://127.0.0.1:8000/api/images/${image.id}`
-    : `http://127.0.0.1:8000/api/images/14`;
-
+    // ? `http://127.0.0.1:8000/api/images/${image.id}`
+    // : `http://127.0.0.1:8000/api/images/14`;
+    ? `http://dyciblueoceantx26.onrender.com/api/images/${image.id}` // RENDER
+    : `http://dyciblueoceantx26.onrender.com/api/images/14`; // RENDER
+    
   return (
     <div className="flex h-full flex-col rounded-xl border border-cyan-300 bg-black/70 p-3 shadow-lg">
       

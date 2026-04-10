@@ -11,7 +11,8 @@ export default function TypingAssistantPanel({ collectionId }) {
     setMessages(m => [...m, userMsg]);
     setInput("");
 
-    const res = await fetch("http://127.0.0.1:8000/api/assistant/chat", {
+    // const res = await fetch("http://127.0.0.1:8000/api/assistant/chat", {
+    const res = await fetch("http://dyciblueoceantx26.onrender.com/api/assistant/chat", { // RENDER
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -13,7 +13,8 @@ const ArtifactFetcher = ({ collectionId }) => {
     setArtifact(null);
     setError(null);
 
-    fetch(`http://localhost:8000/api/artifacts/${collectionId}`)
+    // fetch(`http://localhost:8000/api/artifacts/${collectionId}`)
+    fetch(`http://dyciblueoceantx26.onrender.com/api/artifacts/${collectionId}`) // RENDER
       .then(res => {
         if (!res.ok) throw new Error("Failed to fetch artifact");
         return res.json();

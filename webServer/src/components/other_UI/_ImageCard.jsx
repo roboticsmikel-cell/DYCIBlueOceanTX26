@@ -2,8 +2,10 @@ export default function ImageCard({ image }) {
   if (!image) return null;
 
   const imageUrl = image?.id
-    ? `http://127.0.0.1:8000/api/images/${image.id}`
-    : `http://127.0.0.1:8000/api/images/14`;
+    // ? `http://127.0.0.1:8000/api/images/${image.id}`
+    // : `http://127.0.0.1:8000/api/images/14`;
+    ? `http://dyciblueoceantx26.onrender.com/api/images/${image.id}` // RENDER
+    : `http://dyciblueoceantx26.onrender.com/api/images/14`; // RENDER
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-[#00e5ff]/20 bg-[#111316]/90 p-4 text-[#e2e2e6] shadow-[0_0_24px_rgba(0,229,255,0.08)] backdrop-blur-md">
