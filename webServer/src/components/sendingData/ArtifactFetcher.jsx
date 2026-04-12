@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import InfoCard from "../InfoCard";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const ArtifactFetcher = ({ collectionId }) => {
   const [artifact, setArtifact] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -13,8 +15,7 @@ const ArtifactFetcher = ({ collectionId }) => {
     setArtifact(null);
     setError(null);
 
-    // fetch(`http://localhost:8000/api/artifacts/${collectionId}`)
-    fetch(`http://dyciblueoceantx26.onrender.com/api/artifacts/${collectionId}`) // RENDER
+    fetch(`${API_URL}/api/artifacts/${collectionId}`)
       .then(res => {
         if (!res.ok) throw new Error("Failed to fetch artifact");
         return res.json();

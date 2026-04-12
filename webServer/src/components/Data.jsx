@@ -2,24 +2,27 @@ import { useEffect, useState } from "react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function ArtifactsTablePage({ onBack }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // fetch("http://127.0.0.1:8000/api/artifacts/table")
-    fetch("http://dyciblueoceantx26.onrender.com/api/artifacts/table") // RENDER
+    fetch(`${API_URL}/api/artifacts/table`)
       .then(res => res.json())
       .then(data => {
         setRows(data);
         setLoading(false);
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
   }, []);
 
-  // ✅ PDF Export Function
   const exportPDF = () => {
-    const doc = new jsPDF("landscape"); // better for many columns
+    const doc = new jsPDF("landscape");
 
     doc.text("T.U.K.L.A.S. Database - Registered Artifacts", 14, 15);
 
@@ -44,7 +47,7 @@ export default function ArtifactsTablePage({ onBack }) {
         r.location
       ]),
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [15, 23, 42] } // dark theme header
+      headStyles: { fillColor: [15, 23, 42] }
     });
 
     doc.save("TUKLAS_Artifacts.pdf");

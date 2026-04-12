@@ -1,6 +1,3 @@
-# $env:MESHY_API_KEY="msy_abc123REALKEYxyz"
-# python app.py
-
 from dotenv import load_dotenv
 load_dotenv()
 import os
@@ -289,7 +286,7 @@ def get_model_by_image(image_id):
         "exists": True,
         "model_id": model.model_id,
         "glb_url": model.glb_url,
-        "viewer_url": f"http://127.0.0.1:8000/api/models3d/file/{model.model_id}"
+        "viewer_url": f"http://dyciblueoceantx26.onrender.com/api/models3d/file/{model.model_id}"
     })
 
 @app.route("/api/models3d/file/<int:model_id>")

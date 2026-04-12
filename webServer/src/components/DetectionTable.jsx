@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function DetectionTable() {
   const [data, setData] = useState([]);
 
   useEffect(() => {
-    // fetch("http://127.0.0.1:8000/api/detections")
-    fetch("http://dyciblueoceantx26.onrender.com/api/detections") // RENDER
+    fetch(`${API_URL}/api/detections`)
       .then(res => res.json())
       .then(detections => {
         if (!Array.isArray(detections)) return;
@@ -18,7 +19,9 @@ export default function DetectionTable() {
 
         setData(sorted.slice(0, 5));
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+      });
   }, []);
 
   const formatDate = (dateString) => {

@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function TypingAssistantPanel({ collectionId }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
@@ -11,8 +13,7 @@ export default function TypingAssistantPanel({ collectionId }) {
     setMessages(m => [...m, userMsg]);
     setInput("");
 
-    // const res = await fetch("http://127.0.0.1:8000/api/assistant/chat", {
-    const res = await fetch("http://dyciblueoceantx26.onrender.com/api/assistant/chat", { // RENDER
+    const res = await fetch(`${API_URL}/api/assistant/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

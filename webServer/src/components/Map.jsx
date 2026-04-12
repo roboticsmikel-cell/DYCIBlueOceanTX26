@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import CameraCard from "./CameraCard";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const API_URL = import.meta.env.VITE_API_URL;
 
 const DARK_FUTURE_MAP_STYLE = [
   { elementType: "geometry", stylers: [{ color: "#0b1020" }] },
@@ -92,8 +93,7 @@ export default function Map({ onSelect, onStream }) {
     const bounds = new google.maps.LatLngBounds();
     let hasValid = false;
 
-    // fetch("http://127.0.0.1:8000/api/artifacts")
-    fetch("http://dyciblueoceantx26.onrender.com/api/artifacts") // RENDER
+    fetch(`${API_URL}/api/artifacts`)
       .then(res => res.json())
       .then(artifacts => {
         if (!Array.isArray(artifacts)) return;
@@ -144,8 +144,7 @@ export default function Map({ onSelect, onStream }) {
         console.error("Failed to load artifacts:", err);
       });
 
-    // fetch("http://127.0.0.1:8000/api/detections")
-    fetch("http://dyciblueoceantx26.onrender.com/api/detections") // RENDER
+    fetch(`${API_URL}/api/detections`)
       .then(res => res.json())
       .then(detections => {
         if (!Array.isArray(detections)) return;
@@ -157,14 +156,13 @@ export default function Map({ onSelect, onStream }) {
 
           const position = { lat, lng };
 
-          // Neon red/pink for AI detections
           const marker = new google.maps.Marker({
             position,
             map,
             title: d.label,
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
-              scale: 6,                     // slightly smaller than artifacts
+              scale: 6,
               fillColor: "#f7c100ff",       
               fillOpacity: 1,
               strokeColor: "#FFFFFF",
