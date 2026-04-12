@@ -32,8 +32,8 @@ app.config.from_object(config)
 CORS(app)
 db.init_app(app)
 
-with app.app_context():
-    db.create_all()
+# with app.app_context():
+#     db.create_all()
 
 MESHY_API_KEY = os.getenv("MESHY_API_KEY")
 print("MESHY_API_KEY loaded:", bool(MESHY_API_KEY))
