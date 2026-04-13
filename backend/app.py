@@ -272,6 +272,32 @@ def list_detections():
         return jsonify({"error": str(e)}), 500
 
 
+# ================== HELPER ==================
+def refresh_meshy_glb_url(model: Model3D):
+    """
+    Ask Meshy for the latest task status and refresh the GLB URL.
+    Returns the refreshed URL or None.
+    """
+    response = requests.get(
+        f"{MESHY_BASE_URL}/image-to-3d/{model.meshy_task_id}",
+        headers={"Authorization": f"Bearer {MESHY_API_KEY}"},
+        timeout=120
+    )
+    response.raise_for_status()
+
+    data = response.json()
+
+    model.status = data.get("status", model.status)
+    model.progress = data.get("progress", model.progress)
+
+    refreshed_glb_url = data.get("model_urls", {}).get("glb")
+    if refreshed_glb_url:
+        model.glb_url = refreshed_glb_url
+        model.generated_at = datetime.utcnow()
+
+    return refreshed_glb_url
+
+
 # ================== MESHY 3D ==================
 @app.route("/api/models3d/generate/<int:image_id>", methods=["POST"])
 def generate_3d(image_id):
@@ -323,7 +349,9 @@ def generate_3d(image_id):
             image_id=image.image_id,
             meshy_task_id=task_id,
             status="PENDING",
-            progress=0
+            progress=0,
+            glb_url=None,
+            error_message=None
         )
 
         db.session.add(model)
@@ -364,14 +392,8 @@ def check_model(model_id):
 
             if not model.glb_url:
                 model.error_message = "Meshy succeeded but returned no GLB URL"
-
-            elif not model.glb_data:
-                glb_response = requests.get(model.glb_url, timeout=120)
-                glb_response.raise_for_status()
-
-                model.glb_data = glb_response.content
-                model.glb_mime_type = "model/gltf-binary"
-                model.glb_filename = f"model_{model.model_id}.glb"
+            else:
+                model.error_message = None
 
         elif status == "FAILED":
             model.error_message = "Meshy failed"
@@ -382,7 +404,7 @@ def check_model(model_id):
             "status": model.status,
             "progress": model.progress,
             "glb_url": model.glb_url,
-            "viewer_url": f"{BASE_URL}/api/models3d/file/{model.model_id}" if model.glb_data else None,
+            "viewer_url": f"{BASE_URL}/api/models3d/file/{model.model_id}" if model.glb_url else None,
             "error": model.error_message
         })
 
@@ -405,8 +427,8 @@ def get_model_by_image(image_id):
         if not model:
             return jsonify({"exists": False})
 
-        # Only valid if generation succeeded and GLB is permanently saved
-        if model.status != "SUCCEEDED" or not model.glb_data:
+        # Only valid if generation succeeded and a GLB URL exists
+        if model.status != "SUCCEEDED" or not model.glb_url:
             return jsonify({"exists": False})
 
         return jsonify({
@@ -425,34 +447,41 @@ def get_model_file(model_id):
     try:
         model = Model3D.query.get_or_404(model_id)
 
-        # Serve permanently saved GLB from DB
-        if model.glb_data:
-            return send_file(
-                io.BytesIO(model.glb_data),
-                mimetype=model.glb_mime_type or "model/gltf-binary",
-                as_attachment=False,
-                download_name=model.glb_filename or f"model_{model_id}.glb"
-            )
+        if not model.meshy_task_id:
+            return jsonify({"error": "No Meshy task ID found for this model"}), 404
 
-        # Fallback for old rows that still only have glb_url
+        # Try the currently saved GLB URL first
         if model.glb_url:
-            response = requests.get(model.glb_url, stream=True, timeout=120)
-            response.raise_for_status()
+            try:
+                response = requests.get(model.glb_url, stream=True, timeout=120)
+                response.raise_for_status()
 
-            content = response.content
-            model.glb_data = content
-            model.glb_mime_type = "model/gltf-binary"
-            model.glb_filename = f"model_{model_id}.glb"
-            db.session.commit()
+                return send_file(
+                    io.BytesIO(response.content),
+                    mimetype="model/gltf-binary",
+                    as_attachment=False,
+                    download_name=f"model_{model_id}.glb"
+                )
 
-            return send_file(
-                io.BytesIO(content),
-                mimetype="model/gltf-binary",
-                as_attachment=False,
-                download_name=f"model_{model_id}.glb"
-            )
+            except requests.HTTPError as e:
+                print("Saved GLB URL failed, attempting refresh from Meshy:", e)
 
-        return jsonify({"error": "No GLB file available for this model"}), 404
+        # Refresh from Meshy and retry
+        refreshed_glb_url = refresh_meshy_glb_url(model)
+        db.session.commit()
+
+        if not refreshed_glb_url:
+            return jsonify({"error": "No refreshed GLB URL available"}), 404
+
+        refreshed_response = requests.get(refreshed_glb_url, stream=True, timeout=120)
+        refreshed_response.raise_for_status()
+
+        return send_file(
+            io.BytesIO(refreshed_response.content),
+            mimetype="model/gltf-binary",
+            as_attachment=False,
+            download_name=f"model_{model_id}.glb"
+        )
 
     except Exception as e:
         db.session.rollback()
