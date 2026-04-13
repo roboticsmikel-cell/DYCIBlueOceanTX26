@@ -401,14 +401,49 @@ def get_model_file(model_id):
     try:
         model = Model3D.query.get_or_404(model_id)
 
-        if not model.glb_url:
-            return jsonify({"error": "No GLB URL found for this model"}), 404
+        if not model.meshy_task_id:
+            return jsonify({"error": "No Meshy task ID found for this model"}), 404
 
-        response = requests.get(model.glb_url, stream=True, timeout=120)
-        response.raise_for_status()
+        def fetch_glb_content(glb_url):
+            response = requests.get(glb_url, stream=True, timeout=120)
+            response.raise_for_status()
+            return response.content
+
+        # First try the saved GLB URL
+        if model.glb_url:
+            try:
+                content = fetch_glb_content(model.glb_url)
+                return send_file(
+                    io.BytesIO(content),
+                    mimetype="model/gltf-binary",
+                    as_attachment=False,
+                    download_name=f"model_{model_id}.glb"
+                )
+            except requests.HTTPError as e:
+                print("Saved GLB URL failed, trying to refresh from Meshy:", e)
+
+        # Refresh from Meshy using the task ID
+        meshy_response = requests.get(
+            f"{MESHY_BASE_URL}/image-to-3d/{model.meshy_task_id}",
+            headers={"Authorization": f"Bearer {MESHY_API_KEY}"},
+            timeout=120
+        )
+        meshy_response.raise_for_status()
+        meshy_data = meshy_response.json()
+
+        fresh_glb_url = meshy_data.get("model_urls", {}).get("glb")
+        if not fresh_glb_url:
+            return jsonify({"error": "No fresh GLB URL returned by Meshy"}), 404
+
+        # Save the refreshed URL
+        model.glb_url = fresh_glb_url
+        db.session.commit()
+
+        # Try again with refreshed URL
+        content = fetch_glb_content(fresh_glb_url)
 
         return send_file(
-            io.BytesIO(response.content),
+            io.BytesIO(content),
             mimetype="model/gltf-binary",
             as_attachment=False,
             download_name=f"model_{model_id}.glb"
@@ -417,7 +452,6 @@ def get_model_file(model_id):
     except Exception as e:
         print("GET_MODEL_FILE ERROR:", e)
         return jsonify({"error": str(e)}), 500
-
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8000)

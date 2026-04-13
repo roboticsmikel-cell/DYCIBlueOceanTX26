@@ -198,7 +198,7 @@ export default function SpeakingAssistantPanel({ collectionId }) {
           disabled={listening}
           className="rounded border border-cyan-400 px-3 py-1 text-cyan-300 transition hover:bg-cyan-400/10 disabled:opacity-60"
         >
-          {listening ? "Listening..." : "🎤 Talk"}
+          {listening ? "Listening..." : "Talk"}
         </button>
       </div>
     </div>
