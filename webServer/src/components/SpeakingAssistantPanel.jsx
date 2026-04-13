@@ -1,19 +1,24 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function SpeakingAssistantPanel({ collectionId }) {
   const [messages, setMessages] = useState([]);
   const [listening, setListening] = useState(false);
-  const [voiceSupported, setVoiceSupported] = useState(
-    typeof window !== "undefined" &&
-      !!(window.SpeechRecognition || window.webkitSpeechRecognition)
-  );
+  const [statusText, setStatusText] = useState("Ready");
+  const recognitionRef = useRef(null);
+  const timeoutRef = useRef(null);
+
+  const SpeechRecognition = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  }, []);
 
   async function sendMessage(text) {
     if (!text.trim()) return;
 
     setMessages((m) => [...m, { role: "user", text }]);
+    setStatusText("Sending...");
 
     try {
       const res = await fetch(`${API_URL}/api/assistant/chat`, {
@@ -33,14 +38,16 @@ export default function SpeakingAssistantPanel({ collectionId }) {
         { role: "assistant", text: replyText || "No response received." },
       ]);
 
-      if (replyText) {
+      if (replyText && "speechSynthesis" in window) {
         const utterance = new SpeechSynthesisUtterance(replyText);
         utterance.lang = "en-US";
-        speechSynthesis.cancel();
-        speechSynthesis.speak(utterance);
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
       }
+
+      setStatusText("Ready");
     } catch (error) {
-      console.error(error);
+      console.error("Assistant fetch error:", error);
       setMessages((m) => [
         ...m,
         {
@@ -48,46 +55,98 @@ export default function SpeakingAssistantPanel({ collectionId }) {
           text: "Connection error. Unable to reach assistant.",
         },
       ]);
+      setStatusText("Connection error");
     }
   }
 
-  function startListening() {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+  function stopListeningCleanup() {
+    setListening(false);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    recognitionRef.current = null;
+  }
 
+  function startListening() {
     if (!SpeechRecognition) {
-      setVoiceSupported(false);
-      alert(
-        "Speech recognition is not supported on this device. Please use typing instead."
-      );
+      setStatusText("Voice input not supported");
+      alert("Speech recognition is not supported on this device/browser.");
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    try {
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
 
-    setListening(true);
+      recognition.lang = "en-US";
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
 
-    recognition.onresult = (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript || "";
-      if (transcript.trim()) {
-        sendMessage(transcript);
-      }
-      setListening(false);
-    };
+      setListening(true);
+      setStatusText("Starting microphone...");
 
-    recognition.onerror = (err) => {
-      console.error("Speech recognition error:", err);
-      setListening(false);
-    };
+      timeoutRef.current = setTimeout(() => {
+        try {
+          recognition.stop();
+        } catch {}
+        setStatusText("No speech detected");
+        stopListeningCleanup();
+      }, 8000);
 
-    recognition.onend = () => {
-      setListening(false);
-    };
+      recognition.onstart = () => {
+        setStatusText("Listening...");
+      };
 
-    recognition.start();
+      recognition.onresult = (event) => {
+        const transcript = event.results?.[0]?.[0]?.transcript || "";
+        console.log("Transcript:", transcript);
+
+        if (transcript.trim()) {
+          sendMessage(transcript);
+        } else {
+          setStatusText("No speech detected");
+        }
+
+        stopListeningCleanup();
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+
+        const errorMap = {
+          "not-allowed": "Microphone permission blocked",
+          "service-not-allowed": "Speech service blocked",
+          "network": "Network error",
+          "no-speech": "No speech detected",
+          "audio-capture": "Microphone not found",
+          "aborted": "Listening cancelled",
+        };
+
+        const message = errorMap[event.error] || `Voice error: ${event.error}`;
+        setStatusText(message);
+        stopListeningCleanup();
+      };
+
+      recognition.onend = () => {
+        if (listening) {
+          setStatusText((prev) =>
+            prev === "Listening..." || prev === "Starting microphone..."
+              ? "Ready"
+              : prev
+          );
+        }
+        stopListeningCleanup();
+      };
+
+      recognition.start();
+    } catch (error) {
+      console.error("Speech recognition start failed:", error);
+      setStatusText("Could not start microphone");
+      stopListeningCleanup();
+      alert("Could not start microphone on this device.");
+    }
   }
 
   return (
@@ -132,22 +191,14 @@ export default function SpeakingAssistantPanel({ collectionId }) {
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-cyan-400/20 pt-2">
-        <div className="flex flex-col">
-          <span className="text-xs text-cyan-400">
-            {listening ? "Microphone active" : "Ready"}
-          </span>
-          {!voiceSupported && (
-            <span className="mt-1 text-[10px] text-red-400">
-              Voice input not supported on this device
-            </span>
-          )}
-        </div>
+        <span className="text-xs text-cyan-400">{statusText}</span>
 
         <button
           onClick={startListening}
-          className="rounded border border-cyan-400 px-3 py-1 text-cyan-300 transition hover:bg-cyan-400/10"
+          disabled={listening}
+          className="rounded border border-cyan-400 px-3 py-1 text-cyan-300 transition hover:bg-cyan-400/10 disabled:opacity-60"
         >
-          {listening ? "Listening..." : "Talk"}
+          {listening ? "Listening..." : "🎤 Talk"}
         </button>
       </div>
     </div>
