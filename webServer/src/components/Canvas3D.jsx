@@ -1,6 +1,6 @@
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
-import { useEffect, useRef, useState } from "react";
 
 import CameraCard from "./CameraCard";
 import InfoCard from "./InfoCard";
@@ -11,6 +11,28 @@ import SpeakingAssistantPanel from "./SpeakingAssistantPanel";
 function Model({ modelPath }) {
   const { scene } = useGLTF(modelPath);
   return <primitive object={scene} scale={1.5} />;
+}
+
+class ModelErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error) {
+    console.error("3D model render error:", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return null;
+    }
+    return this.props.children;
+  }
 }
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -36,6 +58,12 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (modelUrl) {
+      console.log("Model URL:", modelUrl);
+    }
+  }, [modelUrl]);
 
   useEffect(() => {
     if (!artifact?.id || artifact.type !== "artifact") return;
@@ -78,8 +106,9 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
     fetch(`${API_URL}/api/models3d/by-image/${activeImage.image_id}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.exists && data.viewer_url) {
-          setModelUrl(data.viewer_url);
+        const url = data.viewer_url || data.glb_url || null;
+        if (data.exists && url) {
+          setModelUrl(url);
         } else {
           setModelUrl(null);
         }
@@ -97,10 +126,7 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
 
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await fetch(
-          `${API_URL}/api/models3d/check/${newModelId}`
-        );
-
+        const res = await fetch(`${API_URL}/api/models3d/check/${newModelId}`);
         const data = await res.json();
 
         if (!res.ok) {
@@ -167,8 +193,6 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
 
   return (
     <div className="grid h-screen w-full grid-cols-1 grid-rows-4 gap-4 bg-black p-4 text-white md:grid-cols-2 md:grid-rows-2">
-      
-      {/* BACK BUTTON */}
       <button
         onClick={onBack}
         className="absolute left-6 top-6 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
@@ -176,7 +200,6 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
         ← Back to Map
       </button>
 
-      {/* CAMERA */}
       <div className="relative min-h-0 overflow-hidden rounded-xl border border-cyan-500">
         <button
           onClick={onStream}
@@ -188,14 +211,11 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
         <CameraCard />
       </div>
 
-      {/* IMAGE / 3D PANEL */}
       <div className="relative min-h-0 overflow-hidden rounded-xl border border-cyan-500">
-
-        {/* BUTTON LOGIC */}
         {modelUrl ? (
           <button
             onClick={() => setViewMode(viewMode === "3d" ? "image" : "3d")}
-            className="absolute right-4 bottom-4 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
+            className="absolute bottom-4 right-4 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
           >
             {viewMode === "3d" ? "View Image" : "View 3D Model"}
           </button>
@@ -209,13 +229,16 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
           </button>
         ) : null}
 
-        {/* VIEW CONTENT */}
         <div className="h-full w-full">
           {viewMode === "3d" && modelUrl ? (
             <Canvas camera={{ position: [0, 2, 5], fov: 50 }}>
               <ambientLight intensity={0.6} />
               <directionalLight position={[5, 5, 5]} intensity={1.2} />
-              <Model modelPath={modelUrl} />
+              <ModelErrorBoundary>
+                <Suspense fallback={null}>
+                  <Model modelPath={modelUrl} />
+                </Suspense>
+              </ModelErrorBoundary>
               <OrbitControls autoRotate autoRotateSpeed={1.2} />
             </Canvas>
           ) : activeImage ? (
@@ -238,7 +261,6 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
         )}
       </div>
 
-      {/* SPEAKING PANEL */}
       <div className="flex min-h-0 flex-col gap-4 overflow-auto rounded-xl border border-cyan-500">
         <SpeakingAssistantPanel
           collectionId={artifact?.id}
@@ -246,7 +268,6 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
         />
       </div>
 
-      {/* INFO PANEL */}
       <div className="relative flex min-h-0 flex-col overflow-auto rounded-xl border border-cyan-500">
         <div className="flex flex-col gap-4 p-4 pb-20">
           {details && <InfoCard {...details} />}

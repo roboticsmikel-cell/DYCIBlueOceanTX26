@@ -1,13 +1,11 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import CameraCard from "./CameraCard";
 import InfoCard from "./InfoCard";
-import ImageCard from "./ImageCard";
 import AnalysisCard from "./AnalysisCard";
 import DetectionTable from "./DetectionTable";
-import TypingAssistantPanel from "./TypingAssistantPanel";
 import SpeakingAssistantPanel from "./SpeakingAssistantPanel";
 
 function Model({ modelPath }) {
@@ -15,15 +13,34 @@ function Model({ modelPath }) {
   return <primitive object={scene} scale={1.5} />;
 }
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   const [details, setDetails] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [activeImage, setActiveImage] = useState(null);
 
+  const [modelUrl, setModelUrl] = useState(null);
+  const [modelId, setModelId] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState("");
+  const [viewMode, setViewMode] = useState("image");
+
+  const pollingRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
-    fetch(`http://127.0.0.1:8000/api/artifacts/${artifact.id}`)
+    fetch(`${API_URL}/api/artifacts/${artifact.id}`)
       .then((res) => res.json())
       .then(setDetails)
       .catch(console.error);
@@ -32,7 +49,7 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   useEffect(() => {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
-    fetch(`http://127.0.0.1:8000/api/ai-analysis/${artifact.id}`)
+    fetch(`${API_URL}/api/ai-analysis/${artifact.id}`)
       .then((res) => res.json())
       .then((data) => setAnalysis(data[0] || null))
       .catch(console.error);
@@ -41,22 +58,125 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   useEffect(() => {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
-    fetch(`http://127.0.0.1:8000/api/images/latest/${artifact.id}`)
+    fetch(`${API_URL}/api/images/latest/${artifact.id}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then(setActiveImage)
+      .then((data) => {
+        setActiveImage(data);
+        setModelUrl(null);
+        setModelId(null);
+        setIsGenerating(false);
+        setProgress(0);
+        setError("");
+        setViewMode("image");
+      })
       .catch(console.error);
   }, [artifact]);
 
+  useEffect(() => {
+    if (!activeImage?.image_id) return;
+
+    fetch(`${API_URL}/api/models3d/by-image/${activeImage.image_id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.exists && data.viewer_url) {
+          setModelUrl(data.viewer_url);
+        } else {
+          setModelUrl(null);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        setModelUrl(null);
+      });
+  }, [activeImage]);
+
+  const startPolling = (newModelId) => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `${API_URL}/api/models3d/check/${newModelId}`
+        );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to check status");
+        }
+
+        setProgress(data.progress || 0);
+
+        if (data.status === "SUCCEEDED") {
+          setModelUrl(data.viewer_url || data.glb_url || null);
+          setViewMode("3d");
+          setIsGenerating(false);
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+
+        if (data.status === "FAILED") {
+          setError(data.error || "3D generation failed");
+          setIsGenerating(false);
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      } catch (err) {
+        console.error(err);
+        setError(err.message);
+        setIsGenerating(false);
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    }, 4000);
+  };
+
+  const handleGenerate3D = async () => {
+    if (!activeImage?.image_id) {
+      setError("No image available.");
+      return;
+    }
+
+    try {
+      setError("");
+      setIsGenerating(true);
+      setProgress(0);
+      setModelUrl(null);
+
+      const res = await fetch(
+        `${API_URL}/api/models3d/generate/${activeImage.image_id}`,
+        { method: "POST" }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Generation failed");
+      }
+
+      setModelId(data.model_id);
+      startPolling(data.model_id);
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
+      setIsGenerating(false);
+    }
+  };
+
   return (
-    <div className="grid h-screen w-full gap-4 p-4 grid-cols-1 grid-rows-4 md:grid-cols-2 md:grid-rows-2 bg-black text-white">
+    <div className="grid h-screen w-full grid-cols-1 grid-rows-4 gap-4 bg-black p-4 text-white md:grid-cols-2 md:grid-rows-2">
       
-      {/* TOP LEFT */}
+      {/* BACK BUTTON */}
       <button
-          onClick={onBack}
-          className="absolute top-6 left-6 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
+        onClick={onBack}
+        className="absolute left-6 top-6 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
       >
-          ← Back to Map
+        ← Back to Map
       </button>
+
+      {/* CAMERA */}
       <div className="relative min-h-0 overflow-hidden rounded-xl border border-cyan-500">
         <button
           onClick={onStream}
@@ -65,72 +185,81 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
           View T.U.K.L.A.S. Camera
         </button>
 
-        <div className="h-full w-full">
-          <CameraCard />
-        </div>
+        <CameraCard />
       </div>
 
-      {/* TOP RIGHT */}
+      {/* IMAGE / 3D PANEL */}
       <div className="relative min-h-0 overflow-hidden rounded-xl border border-cyan-500">
 
-        <div className="h-full w-full">
-          <Canvas
-            camera={{ position: [0, 2, 5], fov: 50 }}
-            onCreated={({ gl }) => gl.setClearColor("#000000")}
+        {/* BUTTON LOGIC */}
+        {modelUrl ? (
+          <button
+            onClick={() => setViewMode(viewMode === "3d" ? "image" : "3d")}
+            className="absolute right-4 bottom-4 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
           >
-            <ambientLight intensity={0.5} />
-            <directionalLight position={[5, 5, 5]} intensity={1} />
-            {artifact?.model && <Model modelPath={`/models/${artifact.model}`} />}
-            <OrbitControls />
-          </Canvas>
+            {viewMode === "3d" ? "View Image" : "View 3D Model"}
+          </button>
+        ) : activeImage ? (
+          <button
+            onClick={handleGenerate3D}
+            disabled={isGenerating}
+            className="absolute right-4 top-4 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
+          >
+            {isGenerating ? `Generating... ${progress}%` : "Make a 3D model"}
+          </button>
+        ) : null}
+
+        {/* VIEW CONTENT */}
+        <div className="h-full w-full">
+          {viewMode === "3d" && modelUrl ? (
+            <Canvas camera={{ position: [0, 2, 5], fov: 50 }}>
+              <ambientLight intensity={0.6} />
+              <directionalLight position={[5, 5, 5]} intensity={1.2} />
+              <Model modelPath={modelUrl} />
+              <OrbitControls autoRotate autoRotateSpeed={1.2} />
+            </Canvas>
+          ) : activeImage ? (
+            <img
+              src={`${API_URL}/api/images/${activeImage.image_id}`}
+              alt="Artifact"
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-gray-400">
+              No image available
+            </div>
+          )}
         </div>
+
+        {error && (
+          <div className="absolute bottom-4 left-4 right-4 rounded border border-red-500 bg-black/80 px-3 py-2 text-red-400">
+            {error}
+          </div>
+        )}
       </div>
 
-      {/* BOTTOM LEFT */}
-      <div className="flex min-h-0 flex-col gap-4 rounded-xl border border-cyan-500 overflow-auto">
-        {/* <ImageCard image={activeImage} /> */}
-
+      {/* SPEAKING PANEL */}
+      <div className="flex min-h-0 flex-col gap-4 overflow-auto rounded-xl border border-cyan-500">
         <SpeakingAssistantPanel
           collectionId={artifact?.id}
           image={activeImage}
         />
       </div>
 
-      {/* BOTTOM RIGHT */}
-      <div className="relative flex min-h-0 flex-col rounded-xl border border-cyan-500 overflow-auto">
+      {/* INFO PANEL */}
+      <div className="relative flex min-h-0 flex-col overflow-auto rounded-xl border border-cyan-500">
         <div className="flex flex-col gap-4 p-4 pb-20">
-          {details && (
-            <InfoCard
-              category={details.category}
-              museum={details.museum}
-              collectionTitle={details.collectionTitle}
-              dateRange={details.dateRange}
-              context={details.context}
-              locationName={details.locationName}
-              period={details.period}
-            />
-          )}
-
-          {analysis && artifact?.type === "artifact" && (
-            <AnalysisCard
-              material={analysis.material}
-              category={analysis.category}
-              estimatedAge={analysis.estimated_age}
-              possibleLocation={analysis.possible_location}
-              preservationCondition={analysis.preservation_condition}
-            />
-          )}
-
+          {details && <InfoCard {...details} />}
+          {analysis && <AnalysisCard {...analysis} />}
           {artifact?.type === "detection" && <DetectionTable />}
         </div>
-        
+
         <button
           onClick={onViewData}
-          className="absolute bottom-4 right-4 z-10 rounded border border-cyan-300 px-3 py-1 text-cyan-300 bg-black/70 backdrop-blur"
+          className="absolute bottom-4 right-4 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
         >
           View Data
         </button>
-
       </div>
     </div>
   );
