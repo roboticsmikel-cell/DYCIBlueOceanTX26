@@ -335,6 +335,7 @@ def generate_3d(image_id):
         })
 
     except Exception as e:
+        db.session.rollback()
         print("GENERATE_3D ERROR:", e)
         return jsonify({"error": str(e)}), 500
 
@@ -386,6 +387,7 @@ def check_model(model_id):
         })
 
     except Exception as e:
+        db.session.rollback()
         print("CHECK_MODEL ERROR:", e)
         return jsonify({"error": str(e)}), 500
 
@@ -453,6 +455,7 @@ def get_model_file(model_id):
         return jsonify({"error": "No GLB file available for this model"}), 404
 
     except Exception as e:
+        db.session.rollback()
         print("GET_MODEL_FILE ERROR:", e)
         return jsonify({"error": str(e)}), 500
 
