@@ -195,6 +195,88 @@ def assistant_chat():
         if not message:
             return jsonify({"error": "Message is required"}), 400
 
+        lower_message = message.lower().strip()
+
+        # =========================
+        # ANALYZE IMAGE COMMAND
+        # =========================
+        if lower_message in ["analyze image", "analyse image", "analyze the image", "analyse the image"]:
+            if not collection_id:
+                return jsonify({"error": "Collection ID is required for image analysis"}), 400
+
+            # get latest image for this artifact/collection
+            latest_image = (
+                Image.query
+                .filter_by(collection_id=collection_id)
+                .order_by(Image.captured_at.desc())
+                .first()
+            )
+
+            if not latest_image:
+                return jsonify({"error": "No image found for this artifact"}), 404
+
+            analysis_result = run_gemini_for_artifact(
+                latest_image.image_data,
+                collection_id
+            )
+
+            if not analysis_result:
+                return jsonify({"error": "Image analysis failed"}), 500
+
+            # Save analysis into DB
+            try:
+                new_analysis = AIArtifactAnalysis(
+                    collection_id=collection_id,
+                    material=analysis_result.get("material"),
+                    category=analysis_result.get("category"),
+                    estimated_age=analysis_result.get("estimated_age"),
+                    possible_location=analysis_result.get("possible_location"),
+                    preservation_condition=analysis_result.get("preservation_condition"),
+                    raw_response=str(analysis_result),
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(new_analysis)
+                db.session.commit()
+            except Exception as db_error:
+                db.session.rollback()
+                print("AI_ANALYSIS SAVE ERROR:", db_error)
+
+            # Convert analysis to short speech/text reply
+            speech_text = (
+                f"Material: {analysis_result.get('material', 'Unknown')}. "
+                f"Category: {analysis_result.get('category', 'Unknown')}. "
+                f"Estimated age: {analysis_result.get('estimated_age', 'Unknown')}. "
+                f"Possible location: {analysis_result.get('possible_location', 'Unknown')}. "
+                f"Condition: {analysis_result.get('preservation_condition', 'Unknown')}."
+            )
+
+            # Save conversation
+            try:
+                db.session.add(AIConversation(
+                    collection_id=collection_id,
+                    role="user",
+                    message=message
+                ))
+                db.session.add(AIConversation(
+                    collection_id=collection_id,
+                    role="assistant",
+                    message=speech_text
+                ))
+                db.session.commit()
+            except Exception as db_error:
+                db.session.rollback()
+                print("AI_CONVERSATION SAVE ERROR:", db_error)
+
+            return jsonify({
+                "reply": speech_text,
+                "speech": speech_text,
+                "type": "image_analysis",
+                "analysis": analysis_result
+            })
+
+        # =========================
+        # NORMAL CHAT
+        # =========================
         artifact_context = None
 
         if collection_id:
@@ -233,9 +315,9 @@ def assistant_chat():
         })
 
     except Exception as e:
+        db.session.rollback()
         print("ASSISTANT_CHAT ERROR:", e)
         return jsonify({"error": str(e)}), 500
-
 
 # ================== DETECTIONS ==================
 @app.route("/api/detections")
