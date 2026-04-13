@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 load_dotenv()
+
 import os
 import io
 import sys
@@ -8,7 +9,6 @@ import requests
 from datetime import datetime
 
 print("PYTHON:", sys.executable)
-# print("API KEY:", MESHY_API_KEY[:10])
 
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
@@ -32,12 +32,10 @@ app.config.from_object(config)
 CORS(app)
 db.init_app(app)
 
-# with app.app_context():
-#     db.create_all()
-
 MESHY_API_KEY = os.getenv("MESHY_API_KEY")
 print("MESHY_API_KEY loaded:", bool(MESHY_API_KEY))
-print("MESHY_API_KEY preview:", MESHY_API_KEY[:10] + "..." if MESHY_API_KEY else "None")
+
+BASE_URL = os.getenv("BASE_URL", "https://dyciblueoceantx26.onrender.com")
 MESHY_BASE_URL = "https://api.meshy.ai/openapi/v1"
 
 
@@ -66,117 +64,215 @@ def get_artifact(collection_id):
 
 @app.route("/api/artifacts")
 def list_artifacts():
-    artifacts = Artifact.query.all()
-    results = []
+    try:
+        artifacts = Artifact.query.all()
+        results = []
 
-    for a in artifacts:
-        if not a.lat_long:
-            continue
+        for a in artifacts:
+            if not a.lat_long:
+                continue
 
-        try:
-            lat, lng = map(float, a.lat_long.split(","))
-        except ValueError:
-            continue
+            try:
+                lat, lng = map(float, a.lat_long.split(","))
+            except ValueError:
+                continue
 
-        results.append({
-            "id": a.collection_id,
-            "title": a.collection_title,
-            "category": a.collection_category,
-            "lat": lat,
-            "lng": lng,
-            "model_path": a.model_path or "models/vase.glb"
-        })
+            results.append({
+                "id": a.collection_id,
+                "title": a.collection_title,
+                "category": a.collection_category,
+                "lat": lat,
+                "lng": lng,
+                "model_path": a.model_path or "models/vase.glb"
+            })
 
-    return jsonify(results)
+        return jsonify(results)
+
+    except Exception as e:
+        print("LIST_ARTIFACTS ERROR:", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/artifacts/table")
+def list_artifacts_table():
+    try:
+        artifacts = Artifact.query.order_by(Artifact.collection_id.asc()).all()
+
+        return jsonify([
+            {
+                "id": a.collection_id,
+                "title": a.collection_title,
+                "period": a.period,
+                "date_range": a.date_range,
+                "category": a.collection_category,
+                "museum": a.collection_museum,
+                "location": a.location_name,
+            }
+            for a in artifacts
+        ])
+
+    except Exception as e:
+        print("LIST_ARTIFACTS_TABLE ERROR:", e)
+        return jsonify({"error": str(e)}), 500
 
 
 # ================== IMAGES ==================
 @app.route("/api/images/<int:image_id>")
 def get_image(image_id):
-    image = Image.query.get_or_404(image_id)
+    try:
+        image = Image.query.get_or_404(image_id)
+        mime_type = image.mime_type or "image/jpeg"
 
-    mime_type = image.mime_type or "image/jpeg"
+        return send_file(
+            io.BytesIO(image.image_data),
+            mimetype=mime_type,
+            as_attachment=False
+        )
 
-    return send_file(
-        io.BytesIO(image.image_data),
-        mimetype=mime_type,
-        as_attachment=False
-    )
+    except Exception as e:
+        print("GET_IMAGE ERROR:", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/images/latest/<int:collection_id>")
 def get_latest_image(collection_id):
-    image = (
-        Image.query
-        .filter_by(collection_id=collection_id)
-        .order_by(Image.captured_at.desc())
-        .first()
-    )
+    try:
+        image = (
+            Image.query
+            .filter_by(collection_id=collection_id)
+            .order_by(Image.captured_at.desc())
+            .first()
+        )
 
-    if not image:
-        return jsonify(None), 404
+        if not image:
+            return jsonify(None), 404
 
-    return jsonify({
-        "image_id": image.image_id,
-        "image_name": image.image_name
-    })
+        return jsonify({
+            "image_id": image.image_id,
+            "image_name": image.image_name
+        })
+
+    except Exception as e:
+        print("GET_LATEST_IMAGE ERROR:", e)
+        return jsonify({"error": str(e)}), 500
 
 
-# ================== AI ==================
+# ================== AI ANALYSIS ==================
 @app.route("/api/ai-analysis/<int:collection_id>")
 def get_ai_analysis(collection_id):
-    analyses = (
-        AIArtifactAnalysis.query
-        .filter_by(collection_id=collection_id)
-        .order_by(AIArtifactAnalysis.created_at.desc())
-        .all()
-    )
+    try:
+        analyses = (
+            AIArtifactAnalysis.query
+            .filter_by(collection_id=collection_id)
+            .order_by(AIArtifactAnalysis.created_at.desc())
+            .all()
+        )
 
-    return jsonify([
-        {
-            "material": a.material,
-            "category": a.category,
-            "estimated_age": a.estimated_age,
-            "possible_location": a.possible_location,
-            "preservation_condition": a.preservation_condition,
-        }
-        for a in analyses
-    ])
+        return jsonify([
+            {
+                "material": a.material,
+                "category": a.category,
+                "estimated_age": a.estimated_age,
+                "possible_location": a.possible_location,
+                "preservation_condition": a.preservation_condition,
+            }
+            for a in analyses
+        ])
+
+    except Exception as e:
+        print("GET_AI_ANALYSIS ERROR:", e)
+        return jsonify({"error": str(e)}), 500
+
+
+# ================== ASSISTANT CHAT ==================
+@app.route("/api/assistant/chat", methods=["POST"])
+def assistant_chat():
+    try:
+        data = request.get_json() or {}
+        collection_id = data.get("collection_id")
+        message = (data.get("message") or "").strip()
+
+        if not message:
+            return jsonify({"error": "Message is required"}), 400
+
+        artifact_context = None
+
+        if collection_id:
+            artifact = Artifact.query.get(collection_id)
+            if artifact:
+                artifact_context = {
+                    "title": artifact.collection_title,
+                    "category": artifact.collection_category,
+                    "context": artifact.collection_info,
+                }
+
+        result = chat_with_gemini(message, artifact_context)
+        reply_text = result.get("speech", "")
+
+        if collection_id:
+            try:
+                db.session.add(AIConversation(
+                    collection_id=collection_id,
+                    role="user",
+                    message=message
+                ))
+                db.session.add(AIConversation(
+                    collection_id=collection_id,
+                    role="assistant",
+                    message=reply_text
+                ))
+                db.session.commit()
+            except Exception as db_error:
+                db.session.rollback()
+                print("AI_CONVERSATION SAVE ERROR:", db_error)
+
+        return jsonify({
+            "reply": reply_text,
+            "speech": reply_text,
+            "type": result.get("type", "chat")
+        })
+
+    except Exception as e:
+        print("ASSISTANT_CHAT ERROR:", e)
+        return jsonify({"error": str(e)}), 500
 
 
 # ================== DETECTIONS ==================
 @app.route("/api/detections")
 def list_detections():
-    detections = Detection.query.order_by(
-        Detection.detected_at.desc()
-    ).all()
+    try:
+        detections = Detection.query.order_by(
+            Detection.detected_at.desc()
+        ).all()
 
-    results = []
+        results = []
 
-    for d in detections:
-        try:
-            if not d.lat_long:
+        for d in detections:
+            try:
+                if not d.lat_long:
+                    continue
+
+                lat, lng = map(float, d.lat_long.split(","))
+
+                results.append({
+                    "id": d.detection_id,
+                    "label": d.label,
+                    "lat": lat,
+                    "lng": lng,
+                    "detected_at": d.detected_at.isoformat() if d.detected_at else None
+                })
+            except Exception as row_error:
+                print(f"Skipping detection {getattr(d, 'detection_id', 'unknown')}: {row_error}")
                 continue
 
-            lat, lng = map(float, d.lat_long.split(","))
+        return jsonify(results)
 
-            results.append({
-                "id": d.detection_id,
-                "label": d.label,
-                "lat": lat,
-                "lng": lng,
-                "detected_at": d.detected_at.isoformat()
-                if d.detected_at else None
-            })
-        except Exception as e:
-            print(f"Skipping detection {getattr(d, 'detection_id', 'unknown')}: {e}")
-            continue
-
-    return jsonify(results)
+    except Exception as e:
+        print("LIST_DETECTIONS ERROR:", e)
+        return jsonify({"error": str(e)}), 500
 
 
 # ================== MESHY 3D ==================
-
 @app.route("/api/models3d/generate/<int:image_id>", methods=["POST"])
 def generate_3d(image_id):
     try:
@@ -236,59 +332,69 @@ def generate_3d(image_id):
         print("GENERATE_3D ERROR:", e)
         return jsonify({"error": str(e)}), 500
 
-# 🔹 CHECK STATUS
+
 @app.route("/api/models3d/check/<int:model_id>")
 def check_model(model_id):
-    model = Model3D.query.get_or_404(model_id)
+    try:
+        model = Model3D.query.get_or_404(model_id)
 
-    response = requests.get(
-        f"{MESHY_BASE_URL}/image-to-3d/{model.meshy_task_id}",
-        headers={"Authorization": f"Bearer {MESHY_API_KEY}"}
-    )
+        response = requests.get(
+            f"{MESHY_BASE_URL}/image-to-3d/{model.meshy_task_id}",
+            headers={"Authorization": f"Bearer {MESHY_API_KEY}"},
+            timeout=120
+        )
+        response.raise_for_status()
 
-    response.raise_for_status()
-    data = response.json()
+        data = response.json()
+        status = data["status"]
 
-    status = data["status"]
+        model.status = status
+        model.progress = data.get("progress", 0)
 
-    model.status = status
-    model.progress = data.get("progress", 0)
+        if status == "SUCCEEDED":
+            model.glb_url = data["model_urls"]["glb"]
+            model.generated_at = datetime.utcnow()
+        elif status == "FAILED":
+            model.error_message = "Meshy failed"
 
-    if status == "SUCCEEDED":
-        model.glb_url = data["model_urls"]["glb"]
-        model.generated_at = datetime.utcnow()
+        db.session.commit()
 
-    elif status == "FAILED":
-        model.error_message = "Meshy failed"
+        return jsonify({
+            "status": model.status,
+            "progress": model.progress,
+            "glb_url": model.glb_url,
+            "viewer_url": f"{BASE_URL}/api/models3d/file/{model.model_id}" if model.glb_url else None
+        })
 
-    db.session.commit()
-
-    return jsonify({
-        "status": model.status,
-        "progress": model.progress,
-        "glb_url": model.glb_url
-    })
+    except Exception as e:
+        print("CHECK_MODEL ERROR:", e)
+        return jsonify({"error": str(e)}), 500
 
 
-# 🔹 GET MODEL
 @app.route("/api/models3d/by-image/<int:image_id>")
 def get_model_by_image(image_id):
-    model = (
-        Model3D.query
-        .filter_by(image_id=image_id, status="SUCCEEDED")
-        .order_by(Model3D.generated_at.desc())
-        .first()
-    )
+    try:
+        model = (
+            Model3D.query
+            .filter_by(image_id=image_id, status="SUCCEEDED")
+            .order_by(Model3D.generated_at.desc())
+            .first()
+        )
 
-    if not model:
-        return jsonify({"exists": False})
+        if not model:
+            return jsonify({"exists": False})
 
-    return jsonify({
-        "exists": True,
-        "model_id": model.model_id,
-        "glb_url": model.glb_url,
-        "viewer_url": f"http://dyciblueoceantx26.onrender.com/api/models3d/file/{model.model_id}"
-    })
+        return jsonify({
+            "exists": True,
+            "model_id": model.model_id,
+            "glb_url": model.glb_url,
+            "viewer_url": f"{BASE_URL}/api/models3d/file/{model.model_id}"
+        })
+
+    except Exception as e:
+        print("GET_MODEL_BY_IMAGE ERROR:", e)
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/models3d/file/<int:model_id>")
 def get_model_file(model_id):
@@ -311,6 +417,7 @@ def get_model_file(model_id):
     except Exception as e:
         print("GET_MODEL_FILE ERROR:", e)
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8000)
