@@ -5,6 +5,10 @@ const API_URL = import.meta.env.VITE_API_URL;
 export default function SpeakingAssistantPanel({ collectionId }) {
   const [messages, setMessages] = useState([]);
   const [listening, setListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(
+    typeof window !== "undefined" &&
+      !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+  );
 
   async function sendMessage(text) {
     if (!text.trim()) return;
@@ -24,29 +28,42 @@ export default function SpeakingAssistantPanel({ collectionId }) {
       const data = await res.json();
       const replyText = data.speech || data.reply || "";
 
-      setMessages((m) => [...m, { role: "assistant", text: replyText || "No response received." }]);
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", text: replyText || "No response received." },
+      ]);
 
       if (replyText) {
         const utterance = new SpeechSynthesisUtterance(replyText);
         utterance.lang = "en-US";
+        speechSynthesis.cancel();
         speechSynthesis.speak(utterance);
       }
     } catch (error) {
       console.error(error);
       setMessages((m) => [
         ...m,
-        { role: "assistant", text: "Connection error. Unable to reach assistant." },
+        {
+          role: "assistant",
+          text: "Connection error. Unable to reach assistant.",
+        },
       ]);
     }
   }
 
   function startListening() {
-    if (!("webkitSpeechRecognition" in window)) {
-      alert("Speech recognition not supported in this browser.");
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setVoiceSupported(false);
+      alert(
+        "Speech recognition is not supported on this device. Please use typing instead."
+      );
       return;
     }
 
-    const recognition = new window.webkitSpeechRecognition();
+    const recognition = new SpeechRecognition();
     recognition.lang = "en-US";
     recognition.continuous = false;
     recognition.interimResults = false;
@@ -54,20 +71,28 @@ export default function SpeakingAssistantPanel({ collectionId }) {
     setListening(true);
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      sendMessage(transcript);
+      const transcript = event.results?.[0]?.[0]?.transcript || "";
+      if (transcript.trim()) {
+        sendMessage(transcript);
+      }
       setListening(false);
     };
 
-    recognition.onerror = () => setListening(false);
-    recognition.onend = () => setListening(false);
+    recognition.onerror = (err) => {
+      console.error("Speech recognition error:", err);
+      setListening(false);
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+    };
 
     recognition.start();
   }
 
   return (
     <div
-      className="flex w-full h-full min-h-[200px] flex-col rounded-xl border border-cyan-400/40
+      className="flex h-full min-h-[200px] w-full flex-col rounded-xl border border-cyan-400/40
                  bg-[#020a13]/90 p-3 text-cyan-100 shadow-[0_0_25px_rgba(0,229,255,0.15)]"
     >
       <div className="mb-2 flex items-center justify-between border-b border-cyan-400/20 pb-2">
@@ -107,9 +132,16 @@ export default function SpeakingAssistantPanel({ collectionId }) {
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-cyan-400/20 pt-2">
-        <span className="text-xs text-cyan-400">
-          {listening ? "Microphone active" : "Ready"}
-        </span>
+        <div className="flex flex-col">
+          <span className="text-xs text-cyan-400">
+            {listening ? "Microphone active" : "Ready"}
+          </span>
+          {!voiceSupported && (
+            <span className="mt-1 text-[10px] text-red-400">
+              Voice input not supported on this device
+            </span>
+          )}
+        </div>
 
         <button
           onClick={startListening}
