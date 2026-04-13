@@ -13,6 +13,15 @@ function Model({ modelPath }) {
   return <primitive object={scene} scale={1.5} />;
 }
 
+function ModelFallback() {
+  return (
+    <mesh>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial />
+    </mesh>
+  );
+}
+
 class ModelErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -29,7 +38,7 @@ class ModelErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
-      return null;
+      return <ModelFallback />;
     }
     return this.props.children;
   }
@@ -107,6 +116,7 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
       .then((res) => res.json())
       .then((data) => {
         const url = data.viewer_url || data.glb_url || null;
+
         if (data.exists && url) {
           setModelUrl(url);
         } else {
@@ -136,9 +146,16 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
         setProgress(data.progress || 0);
 
         if (data.status === "SUCCEEDED") {
-          setModelUrl(data.viewer_url || data.glb_url || null);
+          const url = data.viewer_url || data.glb_url || null;
+
+          if (!url) {
+            throw new Error("3D model finished but no model URL was returned.");
+          }
+
+          setModelUrl(url);
           setViewMode("3d");
           setIsGenerating(false);
+
           clearInterval(pollingRef.current);
           pollingRef.current = null;
         }
@@ -146,6 +163,7 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
         if (data.status === "FAILED") {
           setError(data.error || "3D generation failed");
           setIsGenerating(false);
+
           clearInterval(pollingRef.current);
           pollingRef.current = null;
         }
@@ -153,6 +171,7 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
         console.error(err);
         setError(err.message);
         setIsGenerating(false);
+
         clearInterval(pollingRef.current);
         pollingRef.current = null;
       }
@@ -235,7 +254,7 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
               <ambientLight intensity={0.6} />
               <directionalLight position={[5, 5, 5]} intensity={1.2} />
               <ModelErrorBoundary>
-                <Suspense fallback={null}>
+                <Suspense fallback={<ModelFallback />}>
                   <Model modelPath={modelUrl} />
                 </Suspense>
               </ModelErrorBoundary>
