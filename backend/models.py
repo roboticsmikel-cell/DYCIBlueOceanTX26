@@ -87,7 +87,6 @@ class Detection(db.Model):
     label = db.Column(db.String(255), nullable=False)
     lat_long = db.Column(db.String(255))
     detected_at = db.Column(db.DateTime)
-    model_path = db.Column(db.String)
 
 class Model3D(db.Model):
     __tablename__ = "models_3d"
