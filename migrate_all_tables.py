@@ -24,65 +24,118 @@ render_conn = psycopg2.connect(
 local_cur = local_conn.cursor()
 render_cur = render_conn.cursor()
 
-# -----------------------------
-# GET ALL TABLES
-# -----------------------------
-local_cur.execute("""
-SELECT table_name
-FROM information_schema.tables
-WHERE table_schema = 'public'
-""")
+# Copy in foreign-key-safe order
+TABLE_ORDER = [
+    "artifacts",
+    "detections",
+    "cam_detections",
+    "ex_cam",
+    "example",
+    "images",
+    "videos",
+    "ai_artifact_analysis",
+    "ai_conversations",
+    "models_3d",
+]
 
-tables = local_cur.fetchall()
+print(f"Copy order: {TABLE_ORDER}")
 
-print(f"Found {len(tables)} tables")
-
-# -----------------------------
-# COPY EACH TABLE
-# -----------------------------
-for (table_name,) in tables:
+for table_name in TABLE_ORDER:
     print(f"\nCopying table: {table_name}")
 
-    # Get column names
-    local_cur.execute(f"""
+    # Check if table exists in local DB
+    local_cur.execute("""
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = %s
+        )
+    """, (table_name,))
+    exists_local = local_cur.fetchone()[0]
+
+    if not exists_local:
+        print(f"Skipping {table_name}: not found in local DB")
+        continue
+
+    # Check if table exists in Render DB
+    render_cur.execute("""
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = %s
+        )
+    """, (table_name,))
+    exists_render = render_cur.fetchone()[0]
+
+    if not exists_render:
+        print(f"Skipping {table_name}: not found in Render DB")
+        continue
+
+    # Get common columns in correct order
+    local_cur.execute("""
         SELECT column_name
         FROM information_schema.columns
-        WHERE table_name = '{table_name}'
+        WHERE table_schema = 'public'
+          AND table_name = %s
         ORDER BY ordinal_position
-    """)
-    columns = [col[0] for col in local_cur.fetchall()]
+    """, (table_name,))
+    local_columns = [row[0] for row in local_cur.fetchall()]
+
+    render_cur.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = %s
+        ORDER BY ordinal_position
+    """, (table_name,))
+    render_columns = [row[0] for row in render_cur.fetchall()]
+
+    columns = [col for col in local_columns if col in render_columns]
+
+    if not columns:
+        print(f"Skipping {table_name}: no common columns")
+        continue
+
     col_names = ", ".join(columns)
     placeholders = ", ".join(["%s"] * len(columns))
 
-    # Get all data
-    local_cur.execute(f"SELECT * FROM {table_name}")
+    # Read source rows
+    local_cur.execute(
+        f"SELECT {col_names} FROM {table_name}"
+    )
     rows = local_cur.fetchall()
 
-    print(f"→ {len(rows)} rows")
+    print(f"→ {len(rows)} rows found")
 
-    # Insert into Render
     for row in rows:
         try:
             render_cur.execute(
                 f"""
                 INSERT INTO {table_name} ({col_names})
+                OVERRIDING SYSTEM VALUE
                 VALUES ({placeholders})
                 ON CONFLICT DO NOTHING
                 """,
                 row
             )
         except Exception as e:
-            print(f"Error inserting into {table_name}: {e}")
+            print(f"\n❌ TABLE: {table_name}")
+            print(f"ROW: {row}")
+            print(f"ERROR: {e}\n")
+            render_conn.rollback()
 
-# -----------------------------
-# SAVE CHANGES
-# -----------------------------
-render_conn.commit()
+    try:
+        render_conn.commit()
+        print(f"✅ Finished table: {table_name}")
+    except Exception as e:
+        print(f"❌ Commit failed for {table_name}: {e}")
+        render_conn.rollback()
 
-# CLOSE CONNECTIONS
 local_cur.close()
 render_cur.close()
 local_conn.close()
 render_conn.close()
 
-print("\n✅ ALL TABLES MIGRATED SUCCESSFULLY")
+print("\n✅ ALL TABLES MIGRATION FINISHED")

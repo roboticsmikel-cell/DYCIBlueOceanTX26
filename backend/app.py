@@ -154,22 +154,23 @@ def list_detections():
     results = []
 
     for d in detections:
-        if not d.lat_long:
-            continue
-
         try:
-            lat, lng = map(float, d.lat_long.split(","))
-        except ValueError:
-            continue
+            if not d.lat_long:
+                continue
 
-        results.append({
-            "id": d.detection_id,
-            "label": d.label,
-            "lat": lat,
-            "lng": lng,
-            "detected_at": d.detected_at.isoformat()
-            if d.detected_at else None
-        })
+            lat, lng = map(float, d.lat_long.split(","))
+
+            results.append({
+                "id": d.detection_id,
+                "label": d.label,
+                "lat": lat,
+                "lng": lng,
+                "detected_at": d.detected_at.isoformat()
+                if d.detected_at else None
+            })
+        except Exception as e:
+            print(f"Skipping detection {getattr(d, 'detection_id', 'unknown')}: {e}")
+            continue
 
     return jsonify(results)
 
