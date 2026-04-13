@@ -332,7 +332,6 @@ def generate_3d(image_id):
         print("GENERATE_3D ERROR:", e)
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/api/models3d/check/<int:model_id>")
 def check_model(model_id):
     try:
@@ -352,8 +351,17 @@ def check_model(model_id):
         model.progress = data.get("progress", 0)
 
         if status == "SUCCEEDED":
-            model.glb_url = data["model_urls"]["glb"]
+            model.glb_url = data.get("model_urls", {}).get("glb")
             model.generated_at = datetime.utcnow()
+
+            if model.glb_url and not model.glb_data:
+                glb_response = requests.get(model.glb_url, timeout=120)
+                glb_response.raise_for_status()
+
+                model.glb_data = glb_response.content
+                model.glb_mime_type = "model/gltf-binary"
+                model.glb_filename = f"model_{model.model_id}.glb"
+
         elif status == "FAILED":
             model.error_message = "Meshy failed"
 
@@ -363,13 +371,13 @@ def check_model(model_id):
             "status": model.status,
             "progress": model.progress,
             "glb_url": model.glb_url,
-            "viewer_url": f"{BASE_URL}/api/models3d/file/{model.model_id}" if model.glb_url else None
+            "viewer_url": f"{BASE_URL}/api/models3d/file/{model.model_id}" if (model.glb_data or model.glb_url) else None,
+            "error": model.error_message
         })
 
     except Exception as e:
         print("CHECK_MODEL ERROR:", e)
         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/api/models3d/by-image/<int:image_id>")
 def get_model_by_image(image_id):
@@ -395,59 +403,39 @@ def get_model_by_image(image_id):
         print("GET_MODEL_BY_IMAGE ERROR:", e)
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/api/models3d/file/<int:model_id>")
 def get_model_file(model_id):
     try:
         model = Model3D.query.get_or_404(model_id)
 
-        if not model.meshy_task_id:
-            return jsonify({"error": "No Meshy task ID found for this model"}), 404
+        # Best case: serve permanently saved GLB from your own DB
+        if model.glb_data:
+            return send_file(
+                io.BytesIO(model.glb_data),
+                mimetype=model.glb_mime_type or "model/gltf-binary",
+                as_attachment=False,
+                download_name=model.glb_filename or f"model_{model_id}.glb"
+            )
 
-        def fetch_glb_content(glb_url):
-            response = requests.get(glb_url, stream=True, timeout=120)
-            response.raise_for_status()
-            return response.content
-
-        # First try the saved GLB URL
+        # Fallback: if old records only have glb_url, try to fetch and cache once
         if model.glb_url:
-            try:
-                content = fetch_glb_content(model.glb_url)
-                return send_file(
-                    io.BytesIO(content),
-                    mimetype="model/gltf-binary",
-                    as_attachment=False,
-                    download_name=f"model_{model_id}.glb"
-                )
-            except requests.HTTPError as e:
-                print("Saved GLB URL failed, trying to refresh from Meshy:", e)
+            response = requests.get(model.glb_url, stream=True, timeout=120)
+            response.raise_for_status()
 
-        # Refresh from Meshy using the task ID
-        meshy_response = requests.get(
-            f"{MESHY_BASE_URL}/image-to-3d/{model.meshy_task_id}",
-            headers={"Authorization": f"Bearer {MESHY_API_KEY}"},
-            timeout=120
-        )
-        meshy_response.raise_for_status()
-        meshy_data = meshy_response.json()
+            content = response.content
+            model.glb_data = content
+            model.glb_mime_type = "model/gltf-binary"
+            model.glb_filename = f"model_{model_id}.glb"
+            db.session.commit()
 
-        fresh_glb_url = meshy_data.get("model_urls", {}).get("glb")
-        if not fresh_glb_url:
-            return jsonify({"error": "No fresh GLB URL returned by Meshy"}), 404
+            return send_file(
+                io.BytesIO(content),
+                mimetype="model/gltf-binary",
+                as_attachment=False,
+                download_name=f"model_{model_id}.glb"
+            )
 
-        # Save the refreshed URL
-        model.glb_url = fresh_glb_url
-        db.session.commit()
-
-        # Try again with refreshed URL
-        content = fetch_glb_content(fresh_glb_url)
-
-        return send_file(
-            io.BytesIO(content),
-            mimetype="model/gltf-binary",
-            as_attachment=False,
-            download_name=f"model_{model_id}.glb"
-        )
+        return jsonify({"error": "No GLB file available for this model"}), 404
 
     except Exception as e:
         print("GET_MODEL_FILE ERROR:", e)

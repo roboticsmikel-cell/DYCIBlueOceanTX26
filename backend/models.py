@@ -112,6 +112,10 @@ class Model3D(db.Model):
     fbx_url = db.Column(db.Text)
     usdz_url = db.Column(db.Text)
 
+    glb_data = db.Column(db.LargeBinary)
+    glb_mime_type = db.Column(db.String(100), default="model/gltf-binary")
+    glb_filename = db.Column(db.String(255))
+
     error_message = db.Column(db.Text)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     generated_at = db.Column(db.DateTime)
