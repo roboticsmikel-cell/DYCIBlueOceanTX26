@@ -392,10 +392,13 @@ def get_model_by_image(image_id):
         if not model:
             return jsonify({"exists": False})
 
+        # Only treat it as a valid existing model if the GLB is permanently saved
+        if not model.glb_data:
+            return jsonify({"exists": False})
+
         return jsonify({
             "exists": True,
             "model_id": model.model_id,
-            "glb_url": model.glb_url,
             "viewer_url": f"{BASE_URL}/api/models3d/file/{model.model_id}"
         })
 
