@@ -312,6 +312,12 @@ def generate_3d(image_id):
 
         task_id = data["result"]
 
+        # Remove old 3D model records for this image
+        old_models = Model3D.query.filter_by(image_id=image.image_id).all()
+        for old_model in old_models:
+            db.session.delete(old_model)
+        db.session.flush()
+
         model = Model3D(
             detection_id=getattr(image, "detection_id", None),
             image_id=image.image_id,
@@ -331,6 +337,7 @@ def generate_3d(image_id):
     except Exception as e:
         print("GENERATE_3D ERROR:", e)
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/models3d/check/<int:model_id>")
 def check_model(model_id):
@@ -354,7 +361,10 @@ def check_model(model_id):
             model.glb_url = data.get("model_urls", {}).get("glb")
             model.generated_at = datetime.utcnow()
 
-            if model.glb_url and not model.glb_data:
+            if not model.glb_url:
+                model.error_message = "Meshy succeeded but returned no GLB URL"
+
+            elif not model.glb_data:
                 glb_response = requests.get(model.glb_url, timeout=120)
                 glb_response.raise_for_status()
 
@@ -371,7 +381,7 @@ def check_model(model_id):
             "status": model.status,
             "progress": model.progress,
             "glb_url": model.glb_url,
-            "viewer_url": f"{BASE_URL}/api/models3d/file/{model.model_id}" if (model.glb_data or model.glb_url) else None,
+            "viewer_url": f"{BASE_URL}/api/models3d/file/{model.model_id}" if model.glb_data else None,
             "error": model.error_message
         })
 
@@ -379,21 +389,22 @@ def check_model(model_id):
         print("CHECK_MODEL ERROR:", e)
         return jsonify({"error": str(e)}), 500
 
+
 @app.route("/api/models3d/by-image/<int:image_id>")
 def get_model_by_image(image_id):
     try:
         model = (
             Model3D.query
-            .filter_by(image_id=image_id, status="SUCCEEDED")
-            .order_by(Model3D.generated_at.desc())
+            .filter_by(image_id=image_id)
+            .order_by(Model3D.generated_at.desc().nullslast(), Model3D.model_id.desc())
             .first()
         )
 
         if not model:
             return jsonify({"exists": False})
 
-        # Only treat it as a valid existing model if the GLB is permanently saved
-        if not model.glb_data:
+        # Only valid if generation succeeded and GLB is permanently saved
+        if model.status != "SUCCEEDED" or not model.glb_data:
             return jsonify({"exists": False})
 
         return jsonify({
@@ -406,12 +417,13 @@ def get_model_by_image(image_id):
         print("GET_MODEL_BY_IMAGE ERROR:", e)
         return jsonify({"error": str(e)}), 500
 
+
 @app.route("/api/models3d/file/<int:model_id>")
 def get_model_file(model_id):
     try:
         model = Model3D.query.get_or_404(model_id)
 
-        # Best case: serve permanently saved GLB from your own DB
+        # Serve permanently saved GLB from DB
         if model.glb_data:
             return send_file(
                 io.BytesIO(model.glb_data),
@@ -420,7 +432,7 @@ def get_model_file(model_id):
                 download_name=model.glb_filename or f"model_{model_id}.glb"
             )
 
-        # Fallback: if old records only have glb_url, try to fetch and cache once
+        # Fallback for old rows that still only have glb_url
         if model.glb_url:
             response = requests.get(model.glb_url, stream=True, timeout=120)
             response.raise_for_status()
@@ -443,6 +455,7 @@ def get_model_file(model_id):
     except Exception as e:
         print("GET_MODEL_FILE ERROR:", e)
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8000)
