@@ -95,18 +95,37 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   useEffect(() => {
     if (!artifact?.id || artifact.type !== "artifact") return;
 
-    fetch(`${API_URL}/api/images/latest/${artifact.id}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        setActiveImage(data);
-        setModelUrl(null);
-        setModelId(null);
-        setIsGenerating(false);
-        setProgress(0);
-        setError("");
-        setViewMode("image");
-      })
-      .catch(console.error);
+    let intervalId;
+
+    const fetchLatestImage = () => {
+      fetch(`${API_URL}/api/images/latest/${artifact.id}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (!data) return;
+
+          setActiveImage((prev) => {
+            // only update when image actually changed
+            if (prev?.image_id === data.image_id) {
+              return prev;
+            }
+
+            setModelUrl(null);
+            setModelId(null);
+            setIsGenerating(false);
+            setProgress(0);
+            setError("");
+            setViewMode("image");
+
+            return data;
+          });
+        })
+        .catch(console.error);
+    };
+
+    fetchLatestImage();
+    intervalId = setInterval(fetchLatestImage, 2000);
+
+    return () => clearInterval(intervalId);
   }, [artifact]);
 
   useEffect(() => {
@@ -262,7 +281,7 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
             </Canvas>
           ) : activeImage ? (
             <img
-              src={`${API_URL}/api/images/${activeImage.image_id}`}
+              src={`${API_URL}/api/images/${activeImage.image_id}?t=${activeImage.image_id}`}
               alt="Artifact"
               className="h-full w-full object-contain"
             />
