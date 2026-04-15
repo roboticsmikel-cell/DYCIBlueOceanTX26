@@ -31,11 +31,16 @@ export default function SpeakingAssistantPanel({ collectionId }) {
       });
 
       const data = await res.json();
-      const replyText = data.speech || data.reply || "";
+      const replyText = data.speech || data.reply || "No response received.";
+      const source = data.source || data.type || "assistant";
 
       setMessages((m) => [
         ...m,
-        { role: "assistant", text: replyText || "No response received." },
+        {
+          role: "assistant",
+          text: replyText,
+          source,
+        },
       ]);
 
       if (replyText && "speechSynthesis" in window) {
@@ -48,23 +53,28 @@ export default function SpeakingAssistantPanel({ collectionId }) {
       setStatusText("Ready");
     } catch (error) {
       console.error("Assistant fetch error:", error);
+
       setMessages((m) => [
         ...m,
         {
           role: "assistant",
           text: "Connection error. Unable to reach assistant.",
+          source: "error",
         },
       ]);
+
       setStatusText("Connection error");
     }
   }
 
   function stopListeningCleanup() {
     setListening(false);
+
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+
     recognitionRef.current = null;
   }
 
@@ -118,10 +128,10 @@ export default function SpeakingAssistantPanel({ collectionId }) {
         const errorMap = {
           "not-allowed": "Microphone permission blocked",
           "service-not-allowed": "Speech service blocked",
-          "network": "Network error",
+          network: "Network error",
           "no-speech": "No speech detected",
           "audio-capture": "Microphone not found",
-          "aborted": "Listening cancelled",
+          aborted: "Listening cancelled",
         };
 
         const message = errorMap[event.error] || `Voice error: ${event.error}`;
@@ -130,13 +140,11 @@ export default function SpeakingAssistantPanel({ collectionId }) {
       };
 
       recognition.onend = () => {
-        if (listening) {
-          setStatusText((prev) =>
-            prev === "Listening..." || prev === "Starting microphone..."
-              ? "Ready"
-              : prev
-          );
-        }
+        setStatusText((prev) =>
+          prev === "Listening..." || prev === "Starting microphone..."
+            ? "Ready"
+            : prev
+        );
         stopListeningCleanup();
       };
 
@@ -147,6 +155,22 @@ export default function SpeakingAssistantPanel({ collectionId }) {
       stopListeningCleanup();
       alert("Could not start microphone on this device.");
     }
+  }
+
+  function formatSourceLabel(source) {
+    if (!source) return "TUKLAS";
+
+    const normalized = String(source).toLowerCase();
+
+    if (normalized === "gemini") return "TUKLAS • GEMINI";
+    if (normalized === "fallback") return "TUKLAS • FALLBACK";
+    if (normalized === "image_analysis") return "TUKLAS • IMAGE ANALYSIS";
+    if (normalized === "image_analysis_fallback") return "TUKLAS • ANALYSIS FALLBACK";
+    if (normalized === "chat") return "TUKLAS • CHAT";
+    if (normalized === "chat_fallback") return "TUKLAS • CHAT FALLBACK";
+    if (normalized === "error") return "TUKLAS • ERROR";
+
+    return `TUKLAS • ${String(source).toUpperCase()}`;
   }
 
   return (
@@ -182,7 +206,7 @@ export default function SpeakingAssistantPanel({ collectionId }) {
               }`}
             >
               <div className="mb-1 text-[10px] uppercase tracking-wider opacity-70">
-                {m.role === "user" ? "You" : "TUKLAS"}
+                {m.role === "user" ? "You" : formatSourceLabel(m.source)}
               </div>
               <div>{m.text}</div>
             </div>

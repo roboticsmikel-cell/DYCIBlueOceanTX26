@@ -1,31 +1,16 @@
 import os
 import io
 import json
+import re
 import google.generativeai as genai
 from PIL import Image as PILImage
 from models import Artifact
 
-# genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 if not gemini_api_key:
     raise ValueError("GEMINI_API_KEY is not set")
+
 genai.configure(api_key=gemini_api_key)
-
-ANALYZE_IMAGE_TRIGGERS = [
-    "analyze image",
-    "analyse image",
-    "analyze the image",
-    "analyse the image"
-]
-
-ANALYZE_IMAGE_FIXED_SPEECH = (
-    "The material is burnished earthenware with incised decorations. "
-    "It is a globular storage jar or funerary vessel. "
-    "With approximately 500 BCE to 500 CE, likely from the Iron Age. "
-    "It is possibly found in Southeast Asia, specifically associated with "
-    "the Ban Chiang or Sa Huynh cultures in Thailand or Vietnam."
-)
 
 SYSTEM_PROMPT = """
 You are JARVIS, an archaeology AI assistant.
@@ -37,34 +22,29 @@ Rules:
 - Do NOT use markdown
 - Do NOT introduce yourself unless asked
 - If unsure, say so briefly
-"""
+""".strip()
 
-def is_analyze_image_command(text: str) -> bool:
-    text = text.lower().strip()
-    return any(trigger in text for trigger in ANALYZE_IMAGE_TRIGGERS)
 
-# ----------------------------
-# TEXT CHAT (UNCHANGED)
-# ----------------------------
+def clean_json_text(text: str) -> str:
+    text = text.strip()
+    text = re.sub(r"^```json\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"^```\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
 def chat_with_gemini(user_message, artifact_context=None):
-    # 🔹 FIXED RESPONSE OVERRIDE
-    if is_analyze_image_command(user_message):
-        return {
-            "type": "fixed_analyze_image",
-            "speech": ANALYZE_IMAGE_FIXED_SPEECH
-        }
-
     model = genai.GenerativeModel("gemini-2.0-flash")
 
-    prompt = SYSTEM_PROMPT.strip()
+    prompt = SYSTEM_PROMPT
 
     if artifact_context:
         prompt += f"""
 
 Artifact Context:
-Name: {artifact_context["title"]}
-Category: {artifact_context["category"]}
-Description: {artifact_context["context"]}
+Name: {artifact_context.get("title", "")}
+Category: {artifact_context.get("category", "")}
+Description: {artifact_context.get("context", "")}
 """
 
     prompt += f"""
@@ -80,22 +60,22 @@ Assistant:
         "speech": response.text.strip()
     }
 
-# ----------------------------
-# IMAGE ANALYSIS (FIXED)
-# ----------------------------
+
 def run_gemini_for_artifact(image_bytes, collection_id):
     artifact = Artifact.query.get_or_404(collection_id)
+    image = PILImage.open(io.BytesIO(image_bytes)).convert("RGB")
 
-    image = PILImage.open(io.BytesIO(image_bytes))
-
-    vision_model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro-vision"
-    )
+    vision_model = genai.GenerativeModel("gemini-1.5-flash")
 
     prompt = f"""
 You are an archaeology AI assistant.
 
-Analyze the artifact image and return STRICT JSON:
+Analyze the artifact image and return ONLY valid JSON.
+Do not include markdown.
+Do not include explanation text.
+Do not wrap the JSON in triple backticks.
+
+Return this exact structure:
 
 {{
   "material": "",
@@ -109,13 +89,31 @@ Artifact metadata:
 Name: {artifact.collection_title}
 Category: {artifact.collection_category}
 Context: {artifact.collection_info}
-"""
-
-    response = vision_model.generate_content([prompt, image])
+""".strip()
 
     try:
-        return json.loads(response.text.strip())
+        response = vision_model.generate_content([prompt, image])
+
+        raw_text = (response.text or "").strip()
+        if not raw_text:
+            print("Gemini vision error: empty response")
+            return None
+
+        cleaned_text = clean_json_text(raw_text)
+        parsed = json.loads(cleaned_text)
+
+        return {
+            "material": parsed.get("material", "Unknown"),
+            "category": parsed.get("category", "Unknown"),
+            "estimated_age": parsed.get("estimated_age", "Unknown"),
+            "possible_location": parsed.get("possible_location", "Unknown"),
+            "preservation_condition": parsed.get("preservation_condition", "Unknown")
+        }
+
     except Exception as e:
         print("Gemini vision error:", e)
-        print("Raw response:", response.text)
+        try:
+            print("Raw response:", response.text)
+        except Exception:
+            pass
         return None

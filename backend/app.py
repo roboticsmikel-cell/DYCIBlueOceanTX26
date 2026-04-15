@@ -39,6 +39,64 @@ BASE_URL = os.getenv("BASE_URL", "https://dyciblueoceantx26.onrender.com")
 MESHY_BASE_URL = "https://api.meshy.ai/openapi/v1"
 
 
+# ================== HELPERS ==================
+def build_analysis_speech(analysis: dict) -> str:
+    return (
+        f"Material: {analysis.get('material', 'Unknown')}. "
+        f"Category: {analysis.get('category', 'Unknown')}. "
+        f"Estimated age: {analysis.get('estimated_age', 'Unknown')}. "
+        f"Possible location: {analysis.get('possible_location', 'Unknown')}. "
+        f"Condition: {analysis.get('preservation_condition', 'Unknown')}."
+    )
+
+
+def get_generic_fallback_analysis() -> dict:
+    return {
+        "material": "Unknown",
+        "category": "Unknown",
+        "estimated_age": "Unknown",
+        "possible_location": "Unknown",
+        "preservation_condition": "Could not be determined automatically"
+    }
+
+
+def save_ai_analysis(collection_id: int, analysis: dict, raw_response: str):
+    try:
+        new_analysis = AIArtifactAnalysis(
+            collection_id=collection_id,
+            material=analysis.get("material", "Unknown"),
+            category=analysis.get("category", "Unknown"),
+            estimated_age=analysis.get("estimated_age", "Unknown"),
+            possible_location=analysis.get("possible_location", "Unknown"),
+            preservation_condition=analysis.get("preservation_condition", "Unknown"),
+            raw_response=raw_response,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(new_analysis)
+        db.session.commit()
+    except Exception as db_error:
+        db.session.rollback()
+        print("AI_ANALYSIS SAVE ERROR:", db_error)
+
+
+def save_ai_conversation(collection_id: int, user_message: str, assistant_message: str):
+    try:
+        db.session.add(AIConversation(
+            collection_id=collection_id,
+            role="user",
+            message=user_message
+        ))
+        db.session.add(AIConversation(
+            collection_id=collection_id,
+            role="assistant",
+            message=assistant_message
+        ))
+        db.session.commit()
+    except Exception as db_error:
+        db.session.rollback()
+        print("AI_CONVERSATION SAVE ERROR:", db_error)
+
+
 # ================== BASIC ==================
 @app.route("/")
 def index():
@@ -175,6 +233,7 @@ def get_ai_analysis(collection_id):
                 "estimated_age": a.estimated_age,
                 "possible_location": a.possible_location,
                 "preservation_condition": a.preservation_condition,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
             }
             for a in analyses
         ])
@@ -230,122 +289,46 @@ def assistant_chat():
                     "speech": "No image found for this artifact."
                 }), 404
 
-            # Try real Gemini image analysis first
+            analysis_result = None
+            analysis_source = "fallback"
+
             try:
                 analysis_result = run_gemini_for_artifact(
                     latest_image.image_data,
                     collection_id
                 )
+                if analysis_result:
+                    analysis_source = "gemini"
             except Exception as gemini_error:
                 print("RUN_GEMINI_FOR_ARTIFACT ERROR:", gemini_error)
                 analysis_result = None
 
-            # Fallback if Gemini is unavailable
             if not analysis_result:
-                fallback_analysis = {
-                    "material": "Burnished earthenware with incised decorations",
-                    "category": "Globular storage jar or funerary vessel",
-                    "estimated_age": "Approximately 500 BCE to 500 CE, likely from the Iron Age",
-                    "possible_location": "Southeast Asia, possibly associated with Ban Chiang or Sa Huynh cultures",
-                    "preservation_condition": "Condition could not be verified automatically"
-                }
+                analysis_result = get_generic_fallback_analysis()
 
-                speech_text = (
-                    f"Material: {fallback_analysis['material']}. "
-                    f"Category: {fallback_analysis['category']}. "
-                    f"Estimated age: {fallback_analysis['estimated_age']}. "
-                    f"Possible location: {fallback_analysis['possible_location']}. "
-                    f"Condition: {fallback_analysis['preservation_condition']}."
+            speech_text = build_analysis_speech(analysis_result)
+
+            save_ai_analysis(
+                collection_id=collection_id,
+                analysis=analysis_result,
+                raw_response=(
+                    str(analysis_result)
+                    if analysis_source == "gemini"
+                    else "Fallback analysis used because Gemini returned no valid result."
                 )
-
-                # Save fallback analysis
-                try:
-                    new_analysis = AIArtifactAnalysis(
-                        collection_id=collection_id,
-                        material=fallback_analysis.get("material"),
-                        category=fallback_analysis.get("category"),
-                        estimated_age=fallback_analysis.get("estimated_age"),
-                        possible_location=fallback_analysis.get("possible_location"),
-                        preservation_condition=fallback_analysis.get("preservation_condition"),
-                        raw_response="Fallback analysis used because Gemini API is unavailable.",
-                        created_at=datetime.utcnow()
-                    )
-                    db.session.add(new_analysis)
-                    db.session.commit()
-                except Exception as db_error:
-                    db.session.rollback()
-                    print("AI_ANALYSIS SAVE ERROR:", db_error)
-
-                # Save conversation
-                try:
-                    db.session.add(AIConversation(
-                        collection_id=collection_id,
-                        role="user",
-                        message=message
-                    ))
-                    db.session.add(AIConversation(
-                        collection_id=collection_id,
-                        role="assistant",
-                        message=speech_text
-                    ))
-                    db.session.commit()
-                except Exception as db_error:
-                    db.session.rollback()
-                    print("AI_CONVERSATION SAVE ERROR:", db_error)
-
-                return jsonify({
-                    "reply": speech_text,
-                    "speech": speech_text,
-                    "type": "image_analysis_fallback",
-                    "analysis": fallback_analysis
-                })
-
-            # Save real Gemini analysis
-            try:
-                new_analysis = AIArtifactAnalysis(
-                    collection_id=collection_id,
-                    material=analysis_result.get("material", "Unknown"),
-                    category=analysis_result.get("category", "Unknown"),
-                    estimated_age=analysis_result.get("estimated_age", "Unknown"),
-                    possible_location=analysis_result.get("possible_location", "Unknown"),
-                    preservation_condition=analysis_result.get("preservation_condition", "Unknown"),
-                    raw_response=str(analysis_result),
-                    created_at=datetime.utcnow()
-                )
-                db.session.add(new_analysis)
-                db.session.commit()
-            except Exception as db_error:
-                db.session.rollback()
-                print("AI_ANALYSIS SAVE ERROR:", db_error)
-
-            speech_text = (
-                f"Material: {analysis_result.get('material', 'Unknown')}. "
-                f"Category: {analysis_result.get('category', 'Unknown')}. "
-                f"Estimated age: {analysis_result.get('estimated_age', 'Unknown')}. "
-                f"Possible location: {analysis_result.get('possible_location', 'Unknown')}. "
-                f"Condition: {analysis_result.get('preservation_condition', 'Unknown')}."
             )
 
-            try:
-                db.session.add(AIConversation(
-                    collection_id=collection_id,
-                    role="user",
-                    message=message
-                ))
-                db.session.add(AIConversation(
-                    collection_id=collection_id,
-                    role="assistant",
-                    message=speech_text
-                ))
-                db.session.commit()
-            except Exception as db_error:
-                db.session.rollback()
-                print("AI_CONVERSATION SAVE ERROR:", db_error)
+            save_ai_conversation(
+                collection_id=collection_id,
+                user_message=message,
+                assistant_message=speech_text
+            )
 
             return jsonify({
                 "reply": speech_text,
                 "speech": speech_text,
-                "type": "image_analysis",
+                "type": "image_analysis" if analysis_source == "gemini" else "image_analysis_fallback",
+                "source": analysis_source,
                 "analysis": analysis_result
             })
 
@@ -376,21 +359,11 @@ def assistant_chat():
             reply_text = "I couldn't generate a response right now."
 
         if collection_id:
-            try:
-                db.session.add(AIConversation(
-                    collection_id=collection_id,
-                    role="user",
-                    message=message
-                ))
-                db.session.add(AIConversation(
-                    collection_id=collection_id,
-                    role="assistant",
-                    message=reply_text
-                ))
-                db.session.commit()
-            except Exception as db_error:
-                db.session.rollback()
-                print("AI_CONVERSATION SAVE ERROR:", db_error)
+            save_ai_conversation(
+                collection_id=collection_id,
+                user_message=message,
+                assistant_message=reply_text
+            )
 
         return jsonify({
             "reply": reply_text,
@@ -406,6 +379,7 @@ def assistant_chat():
             "speech": "The AI service is not available right now.",
             "error": str(e)
         }), 500
+
 
 # ================== DETECTIONS ==================
 @app.route("/api/detections")
@@ -444,10 +418,6 @@ def list_detections():
 
 # ================== HELPER ==================
 def refresh_meshy_glb_url(model: Model3D):
-    """
-    Ask Meshy for the latest task status and refresh the GLB URL.
-    Returns the refreshed URL or None.
-    """
     response = requests.get(
         f"{MESHY_BASE_URL}/image-to-3d/{model.meshy_task_id}",
         headers={"Authorization": f"Bearer {MESHY_API_KEY}"},
@@ -508,7 +478,6 @@ def generate_3d(image_id):
 
         task_id = data["result"]
 
-        # Remove old 3D model records for this image
         old_models = Model3D.query.filter_by(image_id=image.image_id).all()
         for old_model in old_models:
             db.session.delete(old_model)
@@ -597,7 +566,6 @@ def get_model_by_image(image_id):
         if not model:
             return jsonify({"exists": False})
 
-        # Only valid if generation succeeded and a GLB URL exists
         if model.status != "SUCCEEDED" or not model.glb_url:
             return jsonify({"exists": False})
 
@@ -620,7 +588,6 @@ def get_model_file(model_id):
         if not model.meshy_task_id:
             return jsonify({"error": "No Meshy task ID found for this model"}), 404
 
-        # Try the currently saved GLB URL first
         if model.glb_url:
             try:
                 response = requests.get(model.glb_url, stream=True, timeout=120)
@@ -636,7 +603,6 @@ def get_model_file(model_id):
             except requests.HTTPError as e:
                 print("Saved GLB URL failed, attempting refresh from Meshy:", e)
 
-        # Refresh from Meshy and retry
         refreshed_glb_url = refresh_meshy_glb_url(model)
         db.session.commit()
 
