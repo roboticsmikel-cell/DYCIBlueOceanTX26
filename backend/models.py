@@ -26,7 +26,7 @@ class Image(db.Model):
     collection_id = db.Column(
         db.Integer,
         db.ForeignKey("artifacts.collection_id", ondelete="CASCADE"),
-        nullable=False
+        nullable=True
     )
 
     detection_id = db.Column(
@@ -87,6 +87,7 @@ class Detection(db.Model):
     label = db.Column(db.String(255), nullable=False)
     lat_long = db.Column(db.String(255))
     detected_at = db.Column(db.DateTime)
+    confidence = db.Column(db.Float)
 
 class Model3D(db.Model):
     __tablename__ = "models_3d"

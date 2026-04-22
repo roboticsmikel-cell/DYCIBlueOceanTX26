@@ -36,11 +36,11 @@ const DARK_FUTURE_MAP_STYLE = [
 ];
 
 const CLASS_COLORS = {
-  burial: "#00E5FF",        // neon cyan
-  pottery: "#FFB300",       // neon amber
-  tool: "#00FF85",          // neon green
-  inscription: "#C77DFF",  // neon violet
-  default: "#FF3D81"        // neon pink
+  burial: "#00E5FF",
+  pottery: "#FFB300",
+  tool: "#00FF85",
+  inscription: "#C77DFF",
+  default: "#FF3D81"
 };
 
 export default function Map({ onSelect, onStream }) {
@@ -58,8 +58,9 @@ export default function Map({ onSelect, onStream }) {
         return;
       }
 
-      if (document.getElementById("google-maps-script")) {
-        resolve();
+      const existingScript = document.getElementById("google-maps-script");
+      if (existingScript) {
+        existingScript.addEventListener("load", resolve);
         return;
       }
 
@@ -76,7 +77,7 @@ export default function Map({ onSelect, onStream }) {
   }
 
   function initMap() {
-    if (!mapRef.current || mapInstance.current) return;
+    if (!mapRef.current || mapInstance.current || !window.google?.maps) return;
 
     const map = new google.maps.Map(mapRef.current, {
       center: { lat: 14.5995, lng: 120.9842 },
@@ -94,19 +95,17 @@ export default function Map({ onSelect, onStream }) {
     let hasValid = false;
 
     fetch(`${API_URL}/api/artifacts`)
-      .then(res => res.json())
-      .then(artifacts => {
+      .then((res) => res.json())
+      .then((artifacts) => {
         if (!Array.isArray(artifacts)) return;
 
-        artifacts.forEach(a => {
+        artifacts.forEach((a) => {
           const lat = Number(a.lat);
           const lng = Number(a.lng);
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
           const position = { lat, lng };
-
-          const color =
-            CLASS_COLORS[a.class_type] || CLASS_COLORS.default;
+          const color = CLASS_COLORS[a.class_type] || CLASS_COLORS.default;
 
           const marker = new google.maps.Marker({
             position,
@@ -130,26 +129,27 @@ export default function Map({ onSelect, onStream }) {
             onSelect({
               id: a.id,
               title: a.title,
-              model: "vase.glb",
-              // model: a.model_path,
-              type: "artifact"
+              model: a.model || "vase.glb",
+              type: "artifact",
+              lat,
+              lng,
+              lat_long: `${lat},${lng}`
             });
-            console.log(a.model_path);
           });
         });
 
         if (hasValid) map.fitBounds(bounds);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error("Failed to load artifacts:", err);
       });
 
     fetch(`${API_URL}/api/detections`)
-      .then(res => res.json())
-      .then(detections => {
+      .then((res) => res.json())
+      .then((detections) => {
         if (!Array.isArray(detections)) return;
 
-        detections.forEach(d => {
+        detections.forEach((d) => {
           const lat = Number(d.lat);
           const lng = Number(d.lng);
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
@@ -163,7 +163,7 @@ export default function Map({ onSelect, onStream }) {
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
               scale: 6,
-              fillColor: "#f7c100ff",       
+              fillColor: "#f7c100ff",
               fillOpacity: 1,
               strokeColor: "#FFFFFF",
               strokeOpacity: 0.7,
@@ -179,15 +179,17 @@ export default function Map({ onSelect, onStream }) {
               id: d.id,
               title: d.label,
               model: "jar.glb",
-              // model: d.model_h,
-              type: "detection"
+              type: "detection",
+              lat,
+              lng,
+              lat_long: d.lat_long || `${lat},${lng}`
             });
           });
         });
 
         if (hasValid) map.fitBounds(bounds);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error("Failed to load detections:", err);
       });
   }
@@ -195,14 +197,6 @@ export default function Map({ onSelect, onStream }) {
   return (
     <div className="h-screen w-full">
       <div ref={mapRef} className="h-full w-full" />
-      {/* <div className="absolute bottom-23 left-6 z-20 pointer-events-none">
-        <CameraCard />
-      </div> */}
-      {/* <button
-        onClick={onStream}
-        className="absolute bottom-9 left-6 z-30 text-sm font-semibold text-cyan-300 mt-4 rounded-xl border border-cyan-300 bg-black/70 p-3 shadow-lg">
-        View T.U.K.L.A.S. Camera
-      </button> */}
     </div>
   );
 }

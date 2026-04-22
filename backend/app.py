@@ -97,6 +97,27 @@ def save_ai_conversation(collection_id: int, user_message: str, assistant_messag
         print("AI_CONVERSATION SAVE ERROR:", db_error)
 
 
+def refresh_meshy_glb_url(model: Model3D):
+    response = requests.get(
+        f"{MESHY_BASE_URL}/image-to-3d/{model.meshy_task_id}",
+        headers={"Authorization": f"Bearer {MESHY_API_KEY}"},
+        timeout=120
+    )
+    response.raise_for_status()
+
+    data = response.json()
+
+    model.status = data.get("status", model.status)
+    model.progress = data.get("progress", model.progress)
+
+    refreshed_glb_url = data.get("model_urls", {}).get("glb")
+    if refreshed_glb_url:
+        model.glb_url = refreshed_glb_url
+        model.generated_at = datetime.utcnow()
+
+    return refreshed_glb_url
+
+
 # ================== BASIC ==================
 @app.route("/")
 def index():
@@ -141,7 +162,8 @@ def list_artifacts():
                 "category": a.collection_category,
                 "lat": lat,
                 "lng": lng,
-                "model_path": a.model_path or "models/vase.glb"
+                "model": a.model_path or "vase.glb",
+                "type": "artifact"
             })
 
         return jsonify(results)
@@ -192,8 +214,8 @@ def get_image(image_id):
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/images/latest/<int:collection_id>")
-def get_latest_image(collection_id):
+@app.route("/api/images/latest/collection/<int:collection_id>")
+def get_latest_collection_image(collection_id):
     try:
         image = (
             Image.query
@@ -207,13 +229,69 @@ def get_latest_image(collection_id):
 
         return jsonify({
             "image_id": image.image_id,
-            "image_name": image.image_name
+            "image_name": image.image_name,
+            "collection_id": image.collection_id
         })
 
     except Exception as e:
-        print("GET_LATEST_IMAGE ERROR:", e)
+        print("GET_LATEST_COLLECTION_IMAGE ERROR:", e)
         return jsonify({"error": str(e)}), 500
 
+
+@app.route("/api/images/latest/detection/<int:detection_id>")
+def get_latest_detection_image(detection_id):
+    try:
+        image = (
+            Image.query
+            .filter_by(detection_id=detection_id)
+            .order_by(Image.captured_at.desc())
+            .first()
+        )
+
+        if not image:
+            return jsonify(None), 404
+
+        return jsonify({
+            "image_id": image.image_id,
+            "image_name": image.image_name,
+            "detection_id": image.detection_id
+        })
+
+    except Exception as e:
+        print("GET_LATEST_DETECTION_IMAGE ERROR:", e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/images/latest/by-location")
+def get_latest_image_by_location():
+    try:
+        lat_long = request.args.get("lat_long")
+
+        if lat_long:
+            lat_long = lat_long.replace(" ", "")
+
+        if not lat_long:
+            return jsonify({"error": "lat_long is required"}), 400
+
+        image = (
+            db.session.query(Image)
+            .join(Detection, Image.detection_id == Detection.detection_id)
+            .filter(Detection.lat_long == lat_long)
+            .order_by(Image.captured_at.desc())
+            .first()
+        )
+
+        if not image:
+            return jsonify(None), 404
+
+        return jsonify({
+            "image_id": image.image_id,
+            "image_name": image.image_name,
+            "detection_id": image.detection_id
+        })
+
+    except Exception as e:
+        print("GET_LATEST_IMAGE_BY_LOCATION ERROR:", e)
+        return jsonify({"error": str(e)}), 500
 
 # ================== AI ANALYSIS ==================
 @app.route("/api/ai-analysis/<int:collection_id>")
@@ -259,9 +337,6 @@ def assistant_chat():
 
         lower_message = message.lower().strip()
 
-        # =========================
-        # ANALYZE IMAGE COMMAND
-        # =========================
         if lower_message in [
             "analyze image",
             "analyse image",
@@ -332,9 +407,6 @@ def assistant_chat():
                 "analysis": analysis_result
             })
 
-        # =========================
-        # NORMAL CHAT
-        # =========================
         artifact_context = None
 
         if collection_id:
@@ -403,7 +475,9 @@ def list_detections():
                     "label": d.label,
                     "lat": lat,
                     "lng": lng,
-                    "detected_at": d.detected_at.isoformat() if d.detected_at else None
+                    "lat_long": d.lat_long,
+                    "detected_at": d.detected_at.isoformat() if d.detected_at else None,
+                    "type": "detection"
                 })
             except Exception as row_error:
                 print(f"Skipping detection {getattr(d, 'detection_id', 'unknown')}: {row_error}")
@@ -414,28 +488,6 @@ def list_detections():
     except Exception as e:
         print("LIST_DETECTIONS ERROR:", e)
         return jsonify({"error": str(e)}), 500
-
-
-# ================== HELPER ==================
-def refresh_meshy_glb_url(model: Model3D):
-    response = requests.get(
-        f"{MESHY_BASE_URL}/image-to-3d/{model.meshy_task_id}",
-        headers={"Authorization": f"Bearer {MESHY_API_KEY}"},
-        timeout=120
-    )
-    response.raise_for_status()
-
-    data = response.json()
-
-    model.status = data.get("status", model.status)
-    model.progress = data.get("progress", model.progress)
-
-    refreshed_glb_url = data.get("model_urls", {}).get("glb")
-    if refreshed_glb_url:
-        model.glb_url = refreshed_glb_url
-        model.generated_at = datetime.utcnow()
-
-    return refreshed_glb_url
 
 
 # ================== MESHY 3D ==================
@@ -572,6 +624,7 @@ def get_model_by_image(image_id):
         return jsonify({
             "exists": True,
             "model_id": model.model_id,
+            "glb_url": model.glb_url,
             "viewer_url": f"{BASE_URL}/api/models3d/file/{model.model_id}"
         })
 
@@ -600,8 +653,8 @@ def get_model_file(model_id):
                     download_name=f"model_{model_id}.glb"
                 )
 
-            except requests.HTTPError as e:
-                print("Saved GLB URL failed, attempting refresh from Meshy:", e)
+            except requests.RequestException as e:
+                print("Saved GLB URL failed:", repr(e))
 
         refreshed_glb_url = refresh_meshy_glb_url(model)
         db.session.commit()
@@ -609,19 +662,23 @@ def get_model_file(model_id):
         if not refreshed_glb_url:
             return jsonify({"error": "No refreshed GLB URL available"}), 404
 
-        refreshed_response = requests.get(refreshed_glb_url, stream=True, timeout=120)
-        refreshed_response.raise_for_status()
+        try:
+            refreshed_response = requests.get(refreshed_glb_url, stream=True, timeout=120)
+            refreshed_response.raise_for_status()
 
-        return send_file(
-            io.BytesIO(refreshed_response.content),
-            mimetype="model/gltf-binary",
-            as_attachment=False,
-            download_name=f"model_{model_id}.glb"
-        )
+            return send_file(
+                io.BytesIO(refreshed_response.content),
+                mimetype="model/gltf-binary",
+                as_attachment=False,
+                download_name=f"model_{model_id}.glb"
+            )
+        except requests.RequestException as e:
+            print("Refreshed GLB URL failed:", repr(e))
+            return jsonify({"error": f"Failed to fetch refreshed GLB: {str(e)}"}), 502
 
     except Exception as e:
         db.session.rollback()
-        print("GET_MODEL_FILE ERROR:", e)
+        print("GET_MODEL_FILE ERROR:", repr(e))
         return jsonify({"error": str(e)}), 500
 
 
