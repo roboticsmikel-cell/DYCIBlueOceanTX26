@@ -10,7 +10,6 @@ import SpeakingAssistantPanel from "./SpeakingAssistantPanel";
 const API_URL = import.meta.env.VITE_API_URL;
 const FALLBACK_MODEL_PATH = "/models/vase.glb";
 
-// Match artifact model file -> fixed local image
 const ARTIFACT_IMAGE_MAP = {
   "vase.glb": "/images/vase.jpg",
   "jar.glb": "/images/jar.jpg",
@@ -71,6 +70,11 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState("image");
 
+  const [modelUrl, setModelUrl] = useState(null);
+  const [modelId, setModelId] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
+
   const pollingRef = useRef(null);
 
   const isArtifact = artifact?.type === "artifact";
@@ -125,17 +129,22 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   }, [artifact, isArtifact]);
 
   useEffect(() => {
+    setModelUrl(null);
+    setModelId(null);
+    setProgress(0);
+    setIsGenerating(false);
+    setError("");
+    setViewMode("image");
+  }, [artifact?.id, artifact?.type]);
+
+  useEffect(() => {
     if (!artifact) {
       setActiveImage(null);
-      setViewMode("image");
-      setError("");
       return;
     }
 
     if (isArtifact) {
       setActiveImage(null);
-      setViewMode("image");
-      setError("");
       return;
     }
 
@@ -168,9 +177,7 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
       fetch(imageUrl)
         .then(async (res) => {
           console.log("latest detection image status:", res.status);
-
           if (!res.ok) return null;
-
           const data = await res.json();
           console.log("Latest detection image response:", data);
           return data;
@@ -186,8 +193,13 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
               return prev;
             }
 
+            setModelUrl(null);
+            setModelId(null);
+            setProgress(0);
+            setIsGenerating(false);
             setError("");
             setViewMode("image");
+
             return data;
           });
         })
@@ -203,13 +215,128 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
     return () => clearInterval(intervalId);
   }, [artifact, isArtifact, isDetection]);
 
+  useEffect(() => {
+    if (isArtifact) return;
+    if (!activeImage?.image_id) {
+      setModelUrl(null);
+      return;
+    }
+
+    fetch(`${API_URL}/api/models3d/by-image/${activeImage.image_id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("3D model by image response:", data);
+
+        const url = data.viewer_url || data.glb_url || null;
+
+        if (data.exists && url) {
+          setModelUrl(url);
+        } else {
+          setModelUrl(null);
+        }
+      })
+      .catch((err) => {
+        console.error("3D model fetch error:", err);
+        setModelUrl(null);
+      });
+  }, [activeImage, isArtifact]);
+
+  const startPolling = (newModelId) => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/models3d/check/${newModelId}`);
+        const data = await res.json();
+
+        console.log("3D polling status response:", data);
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to check status");
+        }
+
+        setProgress(data.progress || 0);
+
+        if (data.status === "SUCCEEDED") {
+          const url = data.viewer_url || data.glb_url || null;
+
+          if (!url) {
+            throw new Error("3D model finished but no model URL was returned.");
+          }
+
+          setModelUrl(url);
+          setViewMode("3d");
+          setIsGenerating(false);
+          setError("");
+
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+
+        if (data.status === "FAILED") {
+          setError(data.error || "3D generation failed");
+          setIsGenerating(false);
+
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      } catch (err) {
+        console.error("3D polling error:", err);
+        setError(err.message);
+        setIsGenerating(false);
+
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    }, 4000);
+  };
+
+  const handleGenerate3D = async () => {
+    if (isArtifact) return;
+
+    if (!activeImage?.image_id) {
+      setError("No image available.");
+      return;
+    }
+
+    try {
+      console.log("Generating 3D for image id:", activeImage.image_id);
+
+      setError("");
+      setIsGenerating(true);
+      setProgress(0);
+      setModelUrl(null);
+
+      const res = await fetch(
+        `${API_URL}/api/models3d/generate/${activeImage.image_id}`,
+        { method: "POST" }
+      );
+
+      const data = await res.json();
+      console.log("Generate 3D response:", data);
+
+      if (!res.ok) {
+        throw new Error(data.error || "Generation failed");
+      }
+
+      setModelId(data.model_id);
+      startPolling(data.model_id);
+    } catch (err) {
+      console.error("Generate 3D error:", err);
+      setError(err.message);
+      setIsGenerating(false);
+    }
+  };
+
   const displayImageSrc = isArtifact
     ? localImageUrl
     : activeImage
     ? `${API_URL}/api/images/${activeImage.image_id}?t=${Date.now()}`
     : null;
 
-  const displayModelUrl = isArtifact ? localModelUrl : null;
+  const displayModelUrl = isArtifact ? localModelUrl : modelUrl;
 
   return (
     <div className="grid h-screen w-full grid-cols-1 grid-rows-4 gap-4 bg-black p-4 text-white md:grid-cols-2 md:grid-rows-2">
@@ -239,10 +366,25 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
           >
             {viewMode === "3d" ? "View Image" : "View 3D Model"}
           </button>
+        ) : isDetection && modelUrl ? (
+          <button
+            onClick={() => setViewMode(viewMode === "3d" ? "image" : "3d")}
+            className="absolute bottom-4 right-4 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
+          >
+            {viewMode === "3d" ? "View Image" : "View 3D Model"}
+          </button>
+        ) : isDetection && activeImage ? (
+          <button
+            onClick={handleGenerate3D}
+            disabled={isGenerating}
+            className="absolute right-4 top-4 z-20 rounded border border-cyan-300 bg-black/70 px-3 py-1 text-cyan-300"
+          >
+            {isGenerating ? `Generating... ${progress}%` : "Generate 3D Model"}
+          </button>
         ) : null}
 
         <div className="h-full w-full">
-          {isArtifact && viewMode === "3d" && displayModelUrl ? (
+          {viewMode === "3d" && displayModelUrl ? (
             <Canvas camera={{ position: [0, 2, 5], fov: 50 }}>
               <ambientLight intensity={0.6} />
               <directionalLight position={[5, 5, 5]} intensity={1.2} />
