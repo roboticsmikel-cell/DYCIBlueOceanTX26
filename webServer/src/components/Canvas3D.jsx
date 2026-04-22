@@ -309,7 +309,7 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
       <div className="relative flex min-h-0 flex-col overflow-auto rounded-xl border border-cyan-500">
         <div className="flex flex-col gap-4 p-4 pb-20">
           {details && <InfoCard {...details} />}
-          {analysis && <AnalysisCard {...analysis} />}
+          {/* {analysis && <AnalysisCard {...analysis} />} */}
           {artifact?.type === "detection" && <DetectionTable />}
         </div>
 
