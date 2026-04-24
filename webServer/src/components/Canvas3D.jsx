@@ -8,16 +8,15 @@ import DetectionTable from "./DetectionTable";
 import SpeakingAssistantPanel from "./SpeakingAssistantPanel";
 
 const API_URL = import.meta.env.VITE_API_URL;
-const FALLBACK_IMAGE_PATH = "/images/artifact.jpg";
-const FALLBACK_MODEL_PATH = "/models/artifact.glb";
+// const FALLBACK_IMAGE_PATH = "/images/artifact.jpg";
+// const FALLBACK_MODEL_PATH = "/models/artifact.glb";
 
-// const ARTIFACT_IMAGE_MAP = {
-//   "vase.glb": "/images/vase.jpg",
-//   "jar.glb": "/images/jar.jpg",
-//   "fuga.glb": "/images/fuga.jpg",
-//   "model.glb": "/images/model.jpg",
-//   "artifact.glb": "/images/artifact.jpg",
-// };
+const ARTIFACT_IMAGE_MAP = {
+  "vase.glb": "/images/vase.jpg",
+  "jar.glb": "/images/jar.jpg",
+  "fuga.glb": "/images/fuga.jpg",
+  "model.glb": "/images/model.jpg",
+};
 
 // const localImageUrl = useMemo(() => {
 //   if (!isArtifact) return null;
