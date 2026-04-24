@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Live Camera</title>
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: black;
+  height: 100%;
+  overflow: hidden;
+}
+
+#camera-container {
+  position: fixed;
+  inset: 0;
+  background: black;
+}
+
+#camera {
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  display: block;
+  background: black;
+}
+
+#controls {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  z-index: 10;
+}
+
+button {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: none;
+  font-size: 14px;
+  color: white;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+
+.capture { border: 2px solid #3b82f6; }
+.start   { border: 2px solid #22c55e; }
+.stop    { border: 2px solid #ef4444; }
+.object { border: 2px solid #a855f7; }
+.translate { border: 2px solid #facc15; }
+
+button:active { transform: scale(0.95); }
+
+#status {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  border-radius: 999px;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 20;
+}
+
+.status-green  { background: rgba(34, 197, 94, 0.95); }
+.status-yellow { background: rgba(234, 179, 8, 0.95); }
+.status-orange { background: rgba(249, 115, 22, 0.95); }
+.status-red    { background: rgba(239, 68, 68, 0.95); }
+</style>
+</head>
+<body>
+
+<div id="camera-container">
+  <img id="camera" src="/video_index" alt="Live Camera Feed">
+  <div id="overlay-box"></div>
+  <div id="status">LIVE</div>
+
+  <div id="controls">
+    <button class="capture" onclick="capture()">SNAP</button>
+    <button class="start" onclick="startVideo()">START</button>
+    <button class="stop" onclick="stopVideo()">STOP</button>
+
+    <button class="object" onclick="setAIMode('object')">OBJ</button>
+    <button class="translate" onclick="setAIMode('translate')">TRANS</button>
+  </div>
+</div>
+
+<script>
+let statusTimeout = null;
+
+function showStatus(text, colorClass) {
+  const status = document.getElementById("status");
+  status.className = "";
+  status.id = "status";
+  status.classList.add(colorClass);
+  status.innerText = text;
+  status.style.opacity = "1";
+
+  if (statusTimeout) clearTimeout(statusTimeout);
+  statusTimeout = setTimeout(() => {
+    status.style.opacity = "0";
+  }, 3000);
+}
+
+async function capture() {
+  try {
+    const res = await fetch("/capture", { method: "POST" });
+    const data = await res.json();
+
+    if (data.status === "ok") showStatus("IMAGE CAPTURED", "status-green");
+    else if (data.status === "no_frame") showStatus("NO FRAME YET", "status-red");
+    else showStatus("CAPTURE FAILED", "status-red");
+  } catch (e) {
+    showStatus("CAPTURE FAILED", "status-red");
+  }
+}
+
+async function startVideo() {
+  try {
+    const res = await fetch("/start_video", { method: "POST" });
+    const data = await res.json();
+
+    if (data.status === "started" || data.status === "already_recording") {
+      showStatus("DETECTION STARTED", "status-yellow");
+    } else {
+      showStatus("START FAILED", "status-red");
+    }
+  } catch (e) {
+    showStatus("START FAILED", "status-red");
+  }
+}
+
+async function stopVideo() {
+  try {
+    const res = await fetch("/stop_video", { method: "POST" });
+    const data = await res.json();
+
+    if (data.status === "saved") {
+      showStatus("DETECTION STOPPED", "status-orange");
+    } else if (data.status === "not_recording") {
+      showStatus("NOT RUNNING", "status-red");
+    } else {
+      showStatus("STOP FAILED", "status-red");
+    }
+  } catch (e) {
+    showStatus("STOP FAILED", "status-red");
+  }
+}
+
+async function setAIMode(mode) {
+  try {
+    const res = await fetch(`/set_ai_mode/${mode}`, { method: "POST" });
+    const data = await res.json();
+
+    if (data.status === "ok") {
+      showStatus(`MODE: ${mode.toUpperCase()}`, "status-green");
+    } else {
+      showStatus("MODE FAILED", "status-red");
+    }
+  } catch (e) {
+    showStatus("MODE FAILED", "status-red");
+  }
+}
+</script>
+
+</body>
+</html>

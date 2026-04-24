@@ -15,6 +15,7 @@ const ARTIFACT_IMAGE_MAP = {
   "jar.glb": "/images/jar.jpg",
   "fuga.glb": "/images/fuga.jpg",
   "model.glb": "/images/model.jpg",
+  "artifact.glb": "/images/artifact.jpg"
 };
 
 function Model({ modelPath, scale = 1.5 }) {
