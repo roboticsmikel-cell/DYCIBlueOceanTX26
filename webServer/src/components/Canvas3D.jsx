@@ -19,10 +19,10 @@ const FALLBACK_MODEL_PATH = "/models/artifact.glb";
 //   "artifact.glb": "/images/artifact.jpg",
 // };
 
-const localImageUrl = useMemo(() => {
-  if (!isArtifact) return null;
-  return FALLBACK_IMAGE_PATH;
-}, [isArtifact]);
+// const localImageUrl = useMemo(() => {
+//   if (!isArtifact) return null;
+//   return FALLBACK_IMAGE_PATH;
+// }, [isArtifact]);
 
 function Model({ modelPath, scale = 1.5 }) {
   const { scene } = useGLTF(modelPath);
@@ -72,6 +72,7 @@ class ModelErrorBoundary extends React.Component {
 }
 
 export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
+
   const [details, setDetails] = useState(null);
   const [activeImage, setActiveImage] = useState(null);
   const [error, setError] = useState("");
