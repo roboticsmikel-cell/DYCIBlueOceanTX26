@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-export default function SpeakingAssistantPanel({ collectionId }) {
+export default function SpeakingAssistantPanel({ collectionId, image }) {
   const [messages, setMessages] = useState([]);
   const [listening, setListening] = useState(false);
   const [statusText, setStatusText] = useState("Ready");
@@ -26,6 +26,7 @@ export default function SpeakingAssistantPanel({ collectionId }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           collection_id: collectionId,
+          image_id: image?.image_id ?? null,
           message: text,
         }),
       });
