@@ -8,6 +8,7 @@ import DetectionTable from "./DetectionTable";
 import SpeakingAssistantPanel from "./SpeakingAssistantPanel";
 
 const API_URL = import.meta.env.VITE_API_URL;
+const FALLBACK_IMAGE_PATH = "/images/artifact.jpg";
 const FALLBACK_MODEL_PATH = "/models/artifact.glb";
 
 const ARTIFACT_IMAGE_MAP = {
@@ -15,7 +16,7 @@ const ARTIFACT_IMAGE_MAP = {
   "jar.glb": "/images/jar.jpg",
   "fuga.glb": "/images/fuga.jpg",
   "model.glb": "/images/model.jpg",
-  "artifact.glb": "/images/artifact.glb",
+  "artifact.glb": "/images/artifact.jpg",
 };
 
 function Model({ modelPath, scale = 1.5 }) {
@@ -337,7 +338,9 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
     ? `${API_URL}/api/images/${activeImage.image_id}?t=${Date.now()}`
     : FALLBACK_IMAGE_PATH;
 
-  const displayModelUrl = isArtifact ? localModelUrl : modelUrl;
+  const displayModelUrl = isArtifact
+  ? localModelUrl || FALLBACK_MODEL_PATH
+  : modelUrl || FALLBACK_MODEL_PATH;
 
   return (
     <div className="grid h-screen w-full grid-cols-1 grid-rows-4 gap-4 bg-black p-4 text-white md:grid-cols-2 md:grid-rows-2">
