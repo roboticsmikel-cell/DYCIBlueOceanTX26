@@ -8,8 +8,8 @@ import DetectionTable from "./DetectionTable";
 import SpeakingAssistantPanel from "./SpeakingAssistantPanel";
 
 const API_URL = import.meta.env.VITE_API_URL;
-// const FALLBACK_IMAGE_PATH = "/images/artifact.jpg";
-// const FALLBACK_MODEL_PATH = "/models/artifact.glb";
+const FALLBACK_IMAGE_PATH = "/images/vase.jpg";
+const FALLBACK_MODEL_PATH = "/models/vase.glb";
 
 const ARTIFACT_IMAGE_MAP = {
   "vase.glb": "/images/vase.jpg",
