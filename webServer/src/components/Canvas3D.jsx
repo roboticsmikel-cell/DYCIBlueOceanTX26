@@ -15,7 +15,7 @@ const ARTIFACT_IMAGE_MAP = {
   "jar.glb": "/images/jar.jpg",
   "fuga.glb": "/images/fuga.jpg",
   "model.glb": "/images/model.jpg",
-  "artifact.glb": "/images/artifact.jpg"
+  "artifact.glb": "/images/artifact.glb",
 };
 
 function Model({ modelPath, scale = 1.5 }) {
@@ -332,10 +332,10 @@ export default function Canvas3D({ artifact, onBack, onViewData, onStream }) {
   };
 
   const displayImageSrc = isArtifact
-    ? localImageUrl
+    ? localImageUrl || FALLBACK_IMAGE_PATH
     : activeImage
     ? `${API_URL}/api/images/${activeImage.image_id}?t=${Date.now()}`
-    : null;
+    : FALLBACK_IMAGE_PATH;
 
   const displayModelUrl = isArtifact ? localModelUrl : modelUrl;
 
