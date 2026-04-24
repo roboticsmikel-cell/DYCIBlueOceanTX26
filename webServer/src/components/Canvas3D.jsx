@@ -8,7 +8,7 @@ import DetectionTable from "./DetectionTable";
 import SpeakingAssistantPanel from "./SpeakingAssistantPanel";
 
 const API_URL = import.meta.env.VITE_API_URL;
-const FALLBACK_MODEL_PATH = "/models/vase.glb";
+const FALLBACK_MODEL_PATH = "/models/artifact.glb";
 
 const ARTIFACT_IMAGE_MAP = {
   "vase.glb": "/images/vase.jpg",
