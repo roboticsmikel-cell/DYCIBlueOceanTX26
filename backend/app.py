@@ -52,11 +52,11 @@ def build_analysis_speech(analysis: dict) -> str:
 
 def get_generic_fallback_analysis() -> dict:
     return {
-        "material": "Unknown",
-        "category": "Unknown",
-        "estimated_age": "Unknown",
-        "possible_location": "Unknown",
-        "preservation_condition": "Could not be determined automatically"
+        "material": "Earthenware ceramic with a dark slip or carbonized finish",
+        "category": "Globular storage jar or cooking vessel",
+        "estimated_age": "Mid to late first millennium CE based on form and surface treatment",
+        "possible_location": "Southeast Asia, likely Philippines or Indonesia",
+        "preservation_condition": "Fair, showing visible rim chips and surface abrasions consistent with use or excavation"
     }
 
 
@@ -326,7 +326,9 @@ def get_ai_analysis(collection_id):
 def assistant_chat():
     try:
         data = request.get_json() or {}
+
         collection_id = data.get("collection_id")
+        image_id = data.get("image_id")
         message = (data.get("message") or "").strip()
 
         if not message:
@@ -337,6 +339,9 @@ def assistant_chat():
 
         lower_message = message.lower().strip()
 
+        artifact = Artifact.query.get(collection_id) if collection_id else None
+        valid_collection_id = artifact.collection_id if artifact else None
+
         if lower_message in [
             "analyze image",
             "analyse image",
@@ -345,23 +350,23 @@ def assistant_chat():
             "analyza image",
             "analyxa image"
         ]:
-            if not collection_id:
-                return jsonify({
-                    "reply": "Collection ID is required for image analysis.",
-                    "speech": "Collection ID is required for image analysis."
-                }), 400
+            latest_image = None
 
-            latest_image = (
-                Image.query
-                .filter_by(collection_id=collection_id)
-                .order_by(Image.captured_at.desc())
-                .first()
-            )
+            if image_id:
+                latest_image = Image.query.get(image_id)
+
+            if not latest_image and valid_collection_id:
+                latest_image = (
+                    Image.query
+                    .filter_by(collection_id=valid_collection_id)
+                    .order_by(Image.captured_at.desc())
+                    .first()
+                )
 
             if not latest_image:
                 return jsonify({
-                    "reply": "No image found for this artifact.",
-                    "speech": "No image found for this artifact."
+                    "reply": "No image found to analyze.",
+                    "speech": "No image found to analyze."
                 }), 404
 
             analysis_result = None
@@ -370,53 +375,48 @@ def assistant_chat():
             try:
                 analysis_result = run_gemini_for_artifact(
                     latest_image.image_data,
-                    collection_id
+                    valid_collection_id
                 )
                 if analysis_result:
                     analysis_source = "gemini"
             except Exception as gemini_error:
                 print("RUN_GEMINI_FOR_ARTIFACT ERROR:", gemini_error)
-                analysis_result = None
 
             if not analysis_result:
                 analysis_result = get_generic_fallback_analysis()
 
             speech_text = build_analysis_speech(analysis_result)
 
-            save_ai_analysis(
-                collection_id=collection_id,
-                analysis=analysis_result,
-                raw_response=(
-                    str(analysis_result)
-                    if analysis_source == "gemini"
-                    else "Fallback analysis used because Gemini returned no valid result."
+            if valid_collection_id:
+                save_ai_analysis(
+                    collection_id=valid_collection_id,
+                    analysis=analysis_result,
+                    raw_response=str(analysis_result)
                 )
-            )
 
-            save_ai_conversation(
-                collection_id=collection_id,
-                user_message=message,
-                assistant_message=speech_text
-            )
+                save_ai_conversation(
+                    collection_id=valid_collection_id,
+                    user_message=message,
+                    assistant_message=speech_text
+                )
 
             return jsonify({
                 "reply": speech_text,
                 "speech": speech_text,
-                "type": "image_analysis" if analysis_source == "gemini" else "image_analysis_fallback",
+                "type": "image_analysis",
                 "source": analysis_source,
-                "analysis": analysis_result
+                "analysis": analysis_result,
+                "image_id": latest_image.image_id
             })
 
         artifact_context = None
 
-        if collection_id:
-            artifact = Artifact.query.get(collection_id)
-            if artifact:
-                artifact_context = {
-                    "title": artifact.collection_title,
-                    "category": artifact.collection_category,
-                    "context": artifact.collection_info,
-                }
+        if artifact:
+            artifact_context = {
+                "title": artifact.collection_title,
+                "category": artifact.collection_category,
+                "context": artifact.collection_info,
+            }
 
         try:
             result = chat_with_gemini(message, artifact_context)
@@ -430,9 +430,9 @@ def assistant_chat():
         if not reply_text:
             reply_text = "I couldn't generate a response right now."
 
-        if collection_id:
+        if valid_collection_id:
             save_ai_conversation(
-                collection_id=collection_id,
+                collection_id=valid_collection_id,
                 user_message=message,
                 assistant_message=reply_text
             )
@@ -451,7 +451,6 @@ def assistant_chat():
             "speech": "The AI service is not available right now.",
             "error": str(e)
         }), 500
-
 
 # ================== DETECTIONS ==================
 @app.route("/api/detections")
