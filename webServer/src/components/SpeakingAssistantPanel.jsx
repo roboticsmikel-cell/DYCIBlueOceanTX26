@@ -166,10 +166,10 @@ export default function SpeakingAssistantPanel({ collectionId, image }) {
     if (normalized === "gemini") return "TUKLAS • GEMINI";
     if (normalized === "fallback") return "TUKLAS";
     if (normalized === "image_analysis") return "TUKLAS • IMAGE ANALYSIS";
-    if (normalized === "image_analysis_fallback") return "TUKLAS • ANALYSIS FALLBACK";
+    if (normalized === "image_analysis_fallback") return "TUKLAS • ANALYSIS";
     if (normalized === "chat") return "TUKLAS • CHAT";
-    if (normalized === "chat_fallback") return "TUKLAS • CHAT FALLBACK";
-    if (normalized === "error") return "TUKLAS • ERROR";
+    if (normalized === "chat_fallback") return "TUKLAS • CHAT";
+    if (normalized === "error") return "TUKLAS";
 
     return `TUKLAS • ${String(source).toUpperCase()}`;
   }
