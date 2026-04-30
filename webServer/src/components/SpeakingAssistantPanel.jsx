@@ -164,7 +164,7 @@ export default function SpeakingAssistantPanel({ collectionId, image }) {
     const normalized = String(source).toLowerCase();
 
     if (normalized === "gemini") return "TUKLAS • GEMINI";
-    if (normalized === "fallback") return "TUKLAS • FALLBACK";
+    if (normalized === "fallback") return "TUKLAS";
     if (normalized === "image_analysis") return "TUKLAS • IMAGE ANALYSIS";
     if (normalized === "image_analysis_fallback") return "TUKLAS • ANALYSIS FALLBACK";
     if (normalized === "chat") return "TUKLAS • CHAT";
