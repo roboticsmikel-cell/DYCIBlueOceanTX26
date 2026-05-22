@@ -19,8 +19,8 @@ export default function CameraCard() {
         <iframe
           // src="http://172.20.10.11:5000/website" // LESLIE
           // src="http://192.168.1.168:5000/website" // DYCI STARLINK
-          // src="http://192.168.1.110:5000/website" // FOR AIR-ROAM
-          src="http://10.231.46.47:5000/website" // MIKEL
+          src="http://192.168.1.110:5000/website" // FOR AIR-ROAM
+          // src="http://10.231.46.47:5000/website" // MIKEL
           title="Live Camera"
           className="h-full w-full object-cover"
         />
