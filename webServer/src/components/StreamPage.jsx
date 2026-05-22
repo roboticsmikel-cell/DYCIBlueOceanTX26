@@ -3,8 +3,9 @@ export default function StreamPage({ onBack }) {
     <div className="relative h-screen w-full overflow-hidden bg-black">
       <iframe
         // src="http://172.20.10.11:5000" // LESLIE
-        src="http://192.168.1.110:5000" // AIR ROAM
+        // src="http://192.168.1.110:5000" // AIR ROAM
         // src="http://192.168.1.168:5000/" // DYCI STARLINK
+        src="http://10.231.46.47:5000/" // MIKEL
         title="AI Vision Stream"
         className="absolute inset-0 h-full w-full"
       />
