@@ -5,7 +5,8 @@ export default function StreamPage({ onBack }) {
         // src="http://172.20.10.11:5000" // LESLIE
         // src="http://192.168.1.110:5000" // AIR ROAM
         // src="http://192.168.1.168:5000/" // DYCI STARLINK
-        src="http://10.231.46.47:5000/" // MIKEL
+        // src="http://10.231.46.47:5000/" // MIKEL-1
+        src="http://10.217.166.47:5000/website" // MIKEL-2
         title="AI Vision Stream"
         className="absolute inset-0 h-full w-full"
       />
