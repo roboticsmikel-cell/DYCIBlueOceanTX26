@@ -21,7 +21,8 @@ export default function CameraCard() {
           // src="http://192.168.1.168:5000/website" // DYCI STARLINK
           // src="http://192.168.1.110:5000/website" // FOR AIR-ROAM
           // src="http://10.231.46.47:5000/website" // MIKEL-1
-          src="http://10.217.166.47:5000/website" // MIKEL-2
+          // src="http://10.217.166.47:5000/website" // MIKEL-2
+          src="http://10.165.142.47:5000/website" // MIKEL-3
           title="Live Camera"
           className="h-full w-full object-cover"
         />
