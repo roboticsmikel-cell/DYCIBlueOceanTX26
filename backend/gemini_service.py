@@ -34,7 +34,7 @@ def clean_json_text(text: str) -> str:
 
 
 def chat_with_gemini(user_message, artifact_context=None):
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.6-flash")
 
     prompt = SYSTEM_PROMPT
 
@@ -65,7 +65,7 @@ def run_gemini_for_artifact(image_bytes, collection_id):
     artifact = Artifact.query.get_or_404(collection_id)
     image = PILImage.open(io.BytesIO(image_bytes)).convert("RGB")
 
-    vision_model = genai.GenerativeModel("gemini-1.5-flash")
+    vision_model = genai.GenerativeModel("gemini-3.6-flash")
 
     prompt = f"""
 You are an archaeology AI assistant.
